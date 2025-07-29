@@ -1,45 +1,109 @@
-<!-- index.html ─ 실사용용 V5.4 -->
 <!DOCTYPE html><html lang="ko">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AI 트레이딩 어시스턴트 V5.4</title>
 
-  <!-- 프레임워크 · 아이콘 -->
+  <!-- UI 프레임워크 & 아이콘 -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet"/>
   <link  href="styles.css" rel="stylesheet"/>
+
+  <!-- favicon (선택 사항) -->
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
 </head>
-<body class="bg-gray-100">
-  <!-- 비밀번호 모달 → app.js에서 표시/제어 -->
-  <div id="pw-modal" class="modal hidden">
-    <div class="modal-box">
-      <h2 class="text-lg font-bold mb-4">🔐 개인용 로그인</h2>
-      <input id="pw-input" type="password" class="input" placeholder="비밀번호"/>
-      <button id="pw-btn" class="btn blue w-full mt-4">입장하기</button>
+<body class="bg-gray-100 font-inter">
+
+  <!-- ◇ 1) 로그인 모달 -->
+  <div id="pw-modal" class="modal">
+    <div class="modal-box w-80">
+      <h2 class="text-xl font-semibold mb-4">🔐 개인용 로그인</h2>
+      <input id="pw-input" type="password" placeholder="비밀번호" class="input mb-4" />
+      <button id="pw-btn" class="btn-blue w-full">입장하기</button>
     </div>
   </div>
 
-  <!-- 네비게이션 -->
-  <nav class="bg-gray-800 text-white p-4 flex space-x-4">
-    <button data-sec="dash" class="nav">대시보드</button>
-    <button data-sec="train" class="nav">훈련</button>
-    <button data-sec="scan" class="nav">예측</button>
-    <button data-sec="grow" class="nav">성장</button>
-    <button data-sec="set"  class="nav">설정</button>
+  <!-- ◇ 2) 네비게이션 바 -->
+  <nav class="bg-gray-800 text-white p-4 flex gap-4">
+    <button data-sec="dash"  class="nav-btn">대시보드</button>
+    <button data-sec="explorer" class="nav-btn">지식 탐색기</button>
+    <button data-sec="performance" class="nav-btn">성과 분석</button>
+    <button data-sec="scan"  class="nav-btn">실시간 스캐너</button>
+    <button data-sec="workflow" class="nav-btn">워크플로우</button>
+    <button data-sec="set"   class="nav-btn ml-auto">설정</button>
   </nav>
 
-  <!-- 섹션들 -->
-  <section id="dash" class="sec active"></section>
-  <section id="train" class="sec"></section>
-  <section id="scan" class="sec"></section>
-  <section id="grow" class="sec"></section>
-  <section id="set"  class="sec"></section>
+  <!-- ◇ 3) 섹션 컨테이너 -->
+  <main id="main-area" class="p-6 space-y-8">
+
+    <!-- 3-1. 대시보드 -->
+    <section id="dash" class="sec active">
+      <h1 class="title">📈 종합 대시보드</h1>
+      <div class="grid md:grid-cols-4 gap-4">
+        <div class="kpi-card"><div id="atom-cnt" class="kpi-num">0</div><p>정의된 아톰</p></div>
+        <div class="kpi-card"><div id="mol-cnt"  class="kpi-num">0</div><p>구축된 분자(전략)</p></div>
+        <div class="kpi-card"><div id="winrate"  class="kpi-num">0%</div><p>평균 전략 승률</p></div>
+        <div class="kpi-card"><div id="trade-cnt" class="kpi-num">0</div><p>총 기록된 거래</p></div>
+      </div>
+
+      <h3 class="subtitle mt-8">최근 시스템 활동</h3>
+      <div id="log" class="log-window"></div>
+    </section>
+
+    <!-- 3-2. 지식 탐색기 -->
+    <section id="explorer" class="sec">
+      <h1 class="title">📚 지식 저장소 탐색기</h1>
+      <input id="search-atom" placeholder="아톰 / 분자 검색…" class="input w-full mb-4" />
+      <div id="atom-table" class="overflow-x-auto"></div>
+    </section>
+
+    <!-- 3-3. 전략 성과 분석 -->
+    <section id="performance" class="sec">
+      <h1 class="title">📊 전략 성과 분석</h1>
+      <canvas id="mol-chart" height="120"></canvas>
+      <table id="perf-table" class="w-full text-sm mt-6 table-auto"></table>
+    </section>
+
+    <!-- 3-4. 실시간 스캐너 -->
+    <section id="scan" class="sec">
+      <h1 class="title">⚡ 실시간 스캐너 (시뮬레이션)</h1>
+      <div class="flex gap-2 mb-4">
+        <input id="sym-input" maxlength="5" placeholder="티커" class="input flex-1" />
+        <button id="add-sym" class="btn-blue">추가</button>
+        <button id="start-scan" class="btn-green">시작</button>
+        <button id="stop-scan" class="btn-red" disabled>정지</button>
+      </div>
+      <div id="sym-tags" class="flex flex-wrap gap-2 mb-4"></div>
+      <h3 class="subtitle">SIDB 실시간 로그</h3>
+      <div id="sidb-log" class="log-window h-60"></div>
+    </section>
+
+    <!-- 3-5. 시스템 워크플로우(설명용 다이어그램) -->
+    <section id="workflow" class="sec">
+      <h1 class="title">🧩 시스템 워크플로우</h1>
+      <img src="https://i.imgur.com/WHeX9LU.png" alt="workflow" class="w-full rounded shadow"/>
+    </section>
+
+    <!-- 3-6. 설정 -->
+    <section id="set" class="sec">
+      <h1 class="title">⚙️ API 설정</h1>
+      <div class="grid gap-4 max-w-xl">
+        <input id="alpaca-key"  placeholder="Alpaca API Key"   class="input" />
+        <input id="alpaca-sec"  placeholder="Alpaca Secret"     class="input" />
+        <input id="gemini-key"  placeholder="Gemini Key"        class="input" />
+        <input id="sheet-id"    placeholder="Sheets ID"         class="input" />
+        <input id="sheet-api"   placeholder="Sheets API Key"    class="input" />
+        <button id="save-set" class="btn-blue mt-2">저장</button>
+      </div>
+      <p id="set-msg" class="mt-2 text-sm text-green-600"></p>
+    </section>
+
+  </main>
 
   <!-- 전역 토스트 -->
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast"></div>
 
-  <!-- 핵심 로직 -->
+  <!-- 로직 스크립트 -->
   <script src="app.js"></script>
 </body>
 </html>

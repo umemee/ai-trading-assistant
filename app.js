@@ -11,10 +11,7 @@ const CFG = {
 '                // ← Google Sheets ID & API Key
 };
 
-/* ▽ 1. 전역 변수 ▽ */
-let atoms=[], molecules=[], watchlist=[], predictions=[], scanTimer=null;
-
-/* ▽ 2. DOM helpers ▽ */
+/* ▽ 1. DOM helpers ▽ */
 const $ = s => document.querySelector(s);
 const $$= s => [...document.querySelectorAll(s)];
 function toast(msg,type='green'){
@@ -26,294 +23,302 @@ function log(msg){
   $('#log').scrollTop = $('#log').scrollHeight;
 }
 
-/* ▽ 3. 로그인 ▽ */
+/* ▽ 2. 로그인 ▽ */
 $('#pw-btn').onclick = ()=>{ 
   if($('#pw-input').value===CFG.PW){ 
     $('#pw-modal').style.display='none'; 
-    sessionStorage.setItem('ok','1');
+    sessionStorage.setItem('ok','true');
     init(); 
-  } else toast('❌ 비밀번호 오류','red'); 
+  } else toast('❌ 비밀번호','red'); 
 };
 if(sessionStorage.getItem('ok')) { $('#pw-modal').style.display='none'; init(); }
 
-/* ▽ 4. 섹션 전환 ▽ */
+/* ▽ 3. 섹션 스위치 ▽ */
 $$('.nav-btn').forEach(btn=>{
-  btn.onclick=e=>{
+  btn.onclick=e=>{ 
     $$('.sec').forEach(s=>s.classList.remove('active'));
-    $$('.nav-btn').forEach(n=>n.classList.remove('active'));
+    $('.nav-btn.active')?.classList.remove('active'); 
     e.target.classList.add('active');
-    $(`#${e.target.dataset.sec}`).classList.add('active');
-  }
+    $('#'+e.target.dataset.sec).classList.add('active');
+  };
 });
 
-/* ▽ 5. Google Sheets API ▽ */
-async function sheetsRead(range){
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${CFG.SHEET_ID}/values/${range}?key=${CFG.SHEET_API}`;
-  const r=await fetch(url);
-  if(!r.ok) throw new Error('Sheets read failed');
+/* ▽ 4. 전역 상태 ▽ */
+let atoms=[], molecules=[], perf=[], watch=[], timer=null, signals=0;
+
+/* ▽ 5. Google Sheets I/O ▽ */
+const gURL = (range)=>`https://sheets.googleapis.com/v4/spreadsheets/${CFG.SHEET_ID}/values/${range}?key=${CFG.SHEET_API}`;
+async function gsRead(range){
+  const r=await fetch(gURL(range));
+  if(!r.ok)throw 'GS read error';
   return (await r.json()).values||[];
 }
-async function sheetsAppend(range,row){
+async function gsAppend(range,row){
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${CFG.SHEET_ID}/values/${range}:append?valueInputOption=RAW&key=${CFG.SHEET_API}`;
-  const r=await fetch(url,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({values:[row]})
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({values:[row]})});
+  if(!r.ok)throw 'GS append error';
+}
+
+async function gsRows(){ 
+  try{
+    atoms = (await gsRead('Atom_DB!A2:F')).map(r=>({id:r[0],name:r[1],desc:r[2],cat:r[4]}));
+    molecules = (await gsRead('Molecule_DB!A2:F')).map(r=>({id:r[0],name:r[1],need:r[3]?.split(',').map(s=>s.trim())||[],thr:parseFloat(r[4]||80)}));
+    perf = (await gsRead('Performance_Dashboard!A2:H')); 
+  }catch(e){
+    toast('시트 연결 실패 - 데모 데이터 사용','red');
+    atoms = [{id:'STR-003',name:'1분_20EMA_지지',cat:'Structural'},{id:'TRG-003',name:'거래량_폭발',cat:'Trigger'}];
+    molecules = [{id:'LOGIC-EXP-004',name:'첫_눌림목',need:['STR-003','TRG-003'],thr:80}];
+    perf = [['LOGIC-EXP-004','12','65','2.1','8.5','1.8','0.85','2024-07-29']];
+  }
+}
+
+/* ▽ 6. 초기화 흐름 ▽ */
+async function init(){
+  // 설정 복원
+  const ss=sessionStorage.getItem('cfg'); 
+  if(ss) Object.assign(CFG, JSON.parse(ss));
+  $('#alpaca-key').value=CFG.ALPACA_KEY; 
+  $('#alpaca-sec').value=CFG.ALPACA_SEC;
+  $('#gemini-key').value=CFG.GEMINI_KEY; 
+  $('#sheet-id').value=CFG.SHEET_ID;
+  $('#sheet-api').value=CFG.SHEET_API;
+
+  // DB 로드
+  await gsRows(); 
+  $('#atom-cnt').textContent=atoms.length; 
+  $('#mol-cnt').textContent=molecules.length;
+  $('#trade-cnt').textContent=perf.length;
+  if(perf.length>0){
+    const avgWin = perf.reduce((sum,r)=>sum+parseFloat(r[2]||0),0)/perf.length;
+    $('#winrate').textContent=avgWin.toFixed(1)+'%';
+  }
+  
+  log(`✅ 시스템 초기화: 아톰 ${atoms.length}개, 분자 ${molecules.length}개`);
+  renderAtomTable(); 
+  renderPerf(); 
+  renderWatch();
+  
+  // 네비 첫 버튼 활성화
+  $('.nav-btn').classList.add('active');
+}
+
+/* ▽ 7. 지식 탐색기 테이블 ▽ */
+function renderAtomTable(){
+  const kw=$('#search-atom').value.trim().toLowerCase();
+  const rows=atoms.filter(a=>!kw||a.name.toLowerCase().includes(kw)||a.id.toLowerCase().includes(kw));
+  let html=`<table class="min-w-full text-sm border-collapse border">
+    <thead><tr class="bg-gray-200 text-left">
+      <th class="border px-3 py-2">ID</th>
+      <th class="border px-3 py-2">이름</th>
+      <th class="border px-3 py-2">카테고리</th>
+      <th class="border px-3 py-2">설명</th>
+    </tr></thead><tbody>`;
+  rows.forEach(r=>{
+    html+=`<tr class="hover:bg-gray-50">
+      <td class="border px-3 py-2 font-mono text-xs">${r.id}</td>
+      <td class="border px-3 py-2">${r.name}</td>
+      <td class="border px-3 py-2">
+        <span class="px-2 py-1 text-xs rounded ${r.cat==='Context'?'bg-blue-100 text-blue-800':r.cat==='Structural'?'bg-green-100 text-green-800':'bg-yellow-100 text-yellow-800'}">${r.cat}</span>
+      </td>
+      <td class="border px-3 py-2 text-xs">${r.desc||'-'}</td>
+    </tr>`;
   });
-  if(!r.ok) throw new Error('Sheets append failed');
+  html+='</tbody></table>';
+  $('#atom-table').innerHTML=html;
 }
+$('#search-atom').oninput=renderAtomTable;
 
-/* ▽ 6. 로직 DB 로드 ▽ */
-async function loadLogicDB(){
-  try{
-    // 아톰 로드
-    const atomRows = await sheetsRead('Atom_DB!A2:F');
-    atoms = atomRows.map(r=>({
-      id:r[0], name:r[1], desc:r[2], output:r[3], cat:r[4], ref:r[5]
-    }));
-    
-    // 분자 로드  
-    const molRows = await sheetsRead('Molecule_DB!A2:F');
-    molecules = molRows.map(r=>({
-      id:r[0], name:r[1], cat:r[2], atoms:r[3]?.split(',').map(s=>s.trim())||[], 
-      threshold:parseFloat(r[4])||80, notes:r[5]
-    }));
-    
-    updateDashboard();
-    updateAtomExplorer();
-    toast(`📊 아톰 ${atoms.length}개, 분자 ${molecules.length}개 로드`);
-    log(`DB 로드 완료: 아톰 ${atoms.length}, 분자 ${molecules.length}`);
-    
-  } catch(e){
-    // 시트 로드 실패 시 데모 데이터
-    atoms = [
-      {id:'CTX-001',name:'촉매_A++등급',cat:'Context',desc:'뉴스 등급이 A++'},
-      {id:'STR-003',name:'1분_20EMA_지지',cat:'Structural',desc:'1분봉 20EMA 지지'},
-      {id:'TRG-003',name:'거래량_폭발',cat:'Trigger',desc:'거래량 500% 급증'},
-      {id:'TRG-008',name:'1분_정배열',cat:'Trigger',desc:'단기/중기/장기 정배열'}
-    ];
-    molecules = [
-      {id:'LOGIC-EXP-004',name:'장 초반 정배열 후 첫 눌림목',atoms:['STR-003','TRG-008'],threshold:80}
-    ];
-    updateDashboard();
-    updateAtomExplorer();
-    toast('⚠️ 시트 연결 실패, 데모 데이터 사용','red');
-    log('시트 로드 실패, 로컬 데이터 사용');
-  }
-}
-
-/* ▽ 7. 대시보드 업데이트 ▽ */
-function updateDashboard(){
-  $('#atom-cnt').textContent = atoms.length;
-  $('#mol-cnt').textContent = molecules.length;
-  $('#winrate').textContent = (Math.random()*30+40).toFixed(1)+'%';
-  $('#trade-cnt').textContent = Math.floor(Math.random()*500+100);
-}
-
-/* ▽ 8. 지식 탐색기 ▽ */
-function updateAtomExplorer(){
-  $('#atom-table').innerHTML = `
-    <table class="w-full text-sm">
-      <thead class="bg-gray-100">
-        <tr><th class="p-2">ID</th><th class="p-2">이름</th><th class="p-2">카테고리</th><th class="p-2">설명</th></tr>
-      </thead>
-      <tbody>
-        ${atoms.map(a=>`<tr class="border-b"><td class="p-2">${a.id}</td><td class="p-2">${a.name}</td><td class="p-2">${a.cat}</td><td class="p-2">${a.desc||'-'}</td></tr>`).join('')}
-      </tbody>
-    </table>
-  `;
-}
-
-/* ▽ 9. Alpaca API (1분봉) ▽ */
-async function getAlpacaBar(symbol){
-  try{
-    const r = await fetch(`https://data.alpaca.markets/v2/stocks/${symbol}/bars?timeframe=1Min&limit=1`,{
-      headers:{
-        'APCA-API-KEY-ID':CFG.ALPACA_KEY,
-        'APCA-API-SECRET-KEY':CFG.ALPACA_SEC
-      }
-    });
-    const json = await r.json();
-    return json.bars?.[0];
-  } catch(e){
-    return null;
-  }
-}
-
-/* ▽ 10. 스캐너 로직 ▽ */
-async function scanTick(){
-  if(!watchlist.length) return;
+/* ▽ 8. 전략 성과 분석 (Chart.js) ▽ */
+function renderPerf(){
+  if(perf.length===0) return;
   
-  for(const sym of watchlist){
-    const bar = await getAlpacaBar(sym);
-    if(!bar) continue;
-    
-    // 아톰 탐지 (예시)
-    const detected = [];
-    if(bar.c > bar.o) detected.push('TRG-008'); // 양봉이면 정배열
-    if(bar.v > 50000) detected.push('TRG-003'); // 거래량 많으면 폭발
-    if(Math.random()<0.3) detected.push('STR-003'); // 랜덤 지지
-    
-    detected.forEach(atomId=>{
-      log(`🔍 ${sym}: ${atomId} 아톰 탐지 (가격: $${bar.c})`);
-      // SIDB에 기록
-      if(CFG.SHEET_ID) sheetsAppend('SIDB!A:H',[Date.now(),sym,atomId,'1Min',bar.c,bar.v,'','']).catch(e=>console.warn('SIDB 기록 실패'));
-    });
-    
-    // 분자 매칭 체크
-    molecules.forEach(mol=>{
-      const match = mol.atoms.filter(a=>detected.includes(a));
-      if(match.length >= mol.atoms.length * mol.threshold/100){
-        log(`🔥 ${sym}: ${mol.id} 분자 신호! (${mol.name})`);
-        const pred = {id:`P${Date.now()}`,ticker:sym,molecule:mol.id,entry:bar.c,time:new Date()};
-        predictions.push(pred);
-        
-        // 예측 시트에 기록
-        if(CFG.SHEET_ID) sheetsAppend('Prediction_Notes!A:S',[
-          pred.id,pred.time.toISOString(),sym,mol.id,`Entry: $${bar.c}`,
-          match.join(','),'','','','','','','','','','','',''
-        ]).catch(e=>console.warn('예측 기록 실패'));
-      }
-    });
+  // Chart.js 로드 확인
+  if(typeof Chart === 'undefined'){
+    $('#mol-chart').outerHTML='<p class="text-gray-500">Chart.js 로딩 중...</p>';
+    setTimeout(renderPerf, 1000);
+    return;
   }
-}
-
-/* ▽ 11. 스캐너 컨트롤 ▽ */
-$('#add-sym').onclick = ()=>{
-  const val = $('#sym-input').value.toUpperCase().trim();
-  if(val && !watchlist.includes(val) && watchlist.length<10){
-    watchlist.push(val);
-    $('#sym-input').value='';
-    updateSymTags();
-    log(`📈 종목 추가: ${val}`);
-  }
-};
-$('#start-scan').onclick = ()=>{
-  if(!watchlist.length) return toast('종목을 먼저 추가하세요','red');
-  if(scanTimer) return toast('이미 실행 중','blue');
   
-  scanTimer = setInterval(scanTick, 60000); // 1분마다
-  $('#start-scan').disabled=true;
-  $('#stop-scan').disabled=false;
-  toast('🚀 스캐너 시작');
-  log('✅ 실시간 스캐너 시작');
-};
-$('#stop-scan').onclick = ()=>{
-  if(scanTimer) clearInterval(scanTimer);
-  scanTimer=null;
-  $('#start-scan').disabled=false;
-  $('#stop-scan').disabled=true;
-  toast('⏹️ 스캐너 정지','blue');
-  log('⏹️ 스캐너 정지됨');
-};
-
-function updateSymTags(){
-  $('#sym-tags').innerHTML = watchlist.map(s=>
-    `<span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-      ${s} <button onclick="removeSym('${s}')" class="ml-1 text-red-500">×</button>
-    </span>`
-  ).join('');
-}
-window.removeSym = function(sym){
-  watchlist = watchlist.filter(s=>s!==sym);
-  updateSymTags();
-  log(`📉 종목 제거: ${sym}`);
-};
-
-/* ▽ 12. 설정 저장 ▽ */
-$('#save-set').onclick = ()=>{
-  CFG.ALPACA_KEY = $('#alpaca-key').value.trim();
-  CFG.ALPACA_SEC = $('#alpaca-sec').value.trim();  
-  CFG.GEMINI_KEY = $('#gemini-key').value.trim();
-  CFG.SHEET_ID   = $('#sheet-id').value.trim();
-  CFG.SHEET_API  = $('#sheet-api').value.trim();
-  
-  sessionStorage.setItem('cfg',JSON.stringify(CFG));
-  $('#set-msg').textContent = '✅ 설정 저장 완료';
-  toast('💾 설정 저장됨');
-  
-  // 설정 변경 후 DB 재로드
-  if(CFG.SHEET_ID && CFG.SHEET_API) loadLogicDB();
-};
-
-/* ▽ 13. 성과 분석 (Chart.js) ▽ */
-function updatePerformanceChart(){
+  const labels = perf.map(r=>r[0]);
+  const wins = perf.map(r=>parseFloat(r[2]||0));
   const ctx = $('#mol-chart').getContext('2d');
+  
   new Chart(ctx,{
     type:'bar',
     data:{
-      labels:molecules.map(m=>m.id),
+      labels,
       datasets:[{
-        label:'승률 (%)',
-        data:molecules.map(()=>Math.random()*60+20),
-        backgroundColor:'rgba(34,197,94,0.6)'
+        label:'승률 %',
+        data:wins,
+        backgroundColor:'#14b8a6',
+        borderColor:'#0f766e',
+        borderWidth:1
       }]
     },
-    options:{responsive:true,scales:{y:{beginAtZero:true,max:100}}}
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true,max:100}}
+    }
   });
   
   // 성과 테이블
-  $('#perf-table').innerHTML = `
-    <thead class="bg-gray-100">
-      <tr><th class="p-2">분자 ID</th><th class="p-2">전략명</th><th class="p-2">승률</th><th class="p-2">수익률</th></tr>
-    </thead>
-    <tbody>
-      ${molecules.map(m=>`
-        <tr class="border-b">
-          <td class="p-2">${m.id}</td><td class="p-2">${m.name}</td>
-          <td class="p-2">${(Math.random()*60+20).toFixed(1)}%</td>
-          <td class="p-2 text-green-600">+${(Math.random()*15+5).toFixed(1)}%</td>
-        </tr>
-      `).join('')}
-    </tbody>
-  `;
+  let t=`<thead><tr class="bg-gray-200 text-sm">
+    <th class="border px-3 py-2">분자 ID</th>
+    <th class="border px-3 py-2">총 거래</th>
+    <th class="border px-3 py-2">승률 %</th>
+    <th class="border px-3 py-2">평균 RRR</th>
+    <th class="border px-3 py-2">평균 보유시간(분)</th>
+    <th class="border px-3 py-2">Profit Factor</th>
+  </tr></thead><tbody>`;
+  
+  perf.forEach(r=>{
+    const winRate = parseFloat(r[2]||0);
+    const rowClass = winRate >= 60 ? 'bg-green-50' : winRate >= 40 ? 'bg-yellow-50' : 'bg-red-50';
+    t+=`<tr class="${rowClass}">
+      <td class="border px-3 py-2 font-mono text-xs">${r[0]}</td>
+      <td class="border px-3 py-2 text-center">${r[1]}</td>
+      <td class="border px-3 py-2 text-center font-semibold">${r[2]}%</td>
+      <td class="border px-3 py-2 text-center">${r[3]}</td>
+      <td class="border px-3 py-2 text-center">${r[4]}</td>
+      <td class="border px-3 py-2 text-center">${r[5]}</td>
+    </tr>`;
+  });
+  t+='</tbody>';
+  $('#perf-table').innerHTML=t;
 }
 
-/* ▽ 14. 검색 기능 ▽ */
-$('#search-atom').oninput = e=>{
-  const query = e.target.value.toLowerCase();
-  const filtered = atoms.filter(a=>
-    a.id.toLowerCase().includes(query) || 
-    a.name.toLowerCase().includes(query)
-  );
+/* ▽ 9. 종목 관리 ▽ */
+$('#add-sym').onclick=()=>{
+  const v=$('#sym-input').value.toUpperCase().trim();
+  if(!v) return toast('티커 입력하세요','red');
+  if(watch.includes(v)) return toast('이미 추가됨','red');
+  if(watch.length>=10) return toast('최대 10개까지','red');
   
-  $('#atom-table').innerHTML = `
-    <table class="w-full text-sm">
-      <thead class="bg-gray-100">
-        <tr><th class="p-2">ID</th><th class="p-2">이름</th><th class="p-2">카테고리</th><th class="p-2">설명</th></tr>
-      </thead>
-      <tbody>
-        ${filtered.map(a=>`<tr class="border-b"><td class="p-2">${a.id}</td><td class="p-2">${a.name}</td><td class="p-2">${a.cat}</td><td class="p-2">${a.desc||'-'}</td></tr>`).join('')}
-      </tbody>
-    </table>
-  `;
+  watch.push(v);
+  $('#sym-input').value='';
+  renderWatch();
+  log(`📈 종목 추가: ${v}`);
+  toast(`${v} 추가완료`);
 };
 
-/* ▽ 15. 초기화 ▽ */
-function init(){
-  // 저장된 설정 복원
-  const saved = sessionStorage.getItem('cfg');
-  if(saved) Object.assign(CFG,JSON.parse(saved));
-  
-  // UI에 값 복원
-  $('#alpaca-key').value = CFG.ALPACA_KEY;
-  $('#alpaca-sec').value = CFG.ALPACA_SEC;
-  $('#gemini-key').value = CFG.GEMINI_KEY;
-  $('#sheet-id').value   = CFG.SHEET_ID;
-  $('#sheet-api').value  = CFG.SHEET_API;
-  
-  // DB 로드 및 UI 업데이트
-  loadLogicDB();
-  
-  // 성과 차트는 분자 로드 후 생성
-  setTimeout(updatePerformanceChart, 1000);
-  
-  log('🚀 시스템 초기화 완료');
-  toast('🎯 시스템 준비됨');
+function renderWatch(){
+  $('#sym-tags').innerHTML = watch.map(t=>
+    `<span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+      ${t} <button onclick="removeSym('${t}')" class="ml-1 text-red-500 hover:text-red-700">×</button>
+    </span>`
+  ).join('');
 }
 
-/* ▽ 16. Enter 키 이벤트 ▽ */
-$('#sym-input').onkeypress = e=>{ if(e.key==='Enter') $('#add-sym').click(); };
-$('#pw-input').onkeypress  = e=>{ if(e.key==='Enter') $('#pw-btn').click(); };
+window.removeSym = function(sym){
+  watch = watch.filter(s=>s!==sym);
+  renderWatch();
+  log(`📉 종목 제거: ${sym}`);
+};
+
+/* ▽ 10. 스캐너 (시뮬레이션) ▽ */
+$('#start-scan').onclick=()=>{
+  if(watch.length===0) return toast('감시할 종목이 없습니다','red');
+  if(timer) return toast('이미 실행 중','blue');
+  
+  $('#start-scan').disabled=true;
+  $('#stop-scan').disabled=false;
+  signals=0;
+  
+  timer = setInterval(scanTick, 15000); // 15초마다
+  log('🚀 스캐너 시작');
+  toast('스캐너 시작');
+  scanTick(); // 즉시 1회 실행
+};
+
+$('#stop-scan').onclick=()=>{
+  if(timer) clearInterval(timer);
+  timer=null;
+  $('#start-scan').disabled=false;
+  $('#stop-scan').disabled=true;
+  log('⏹ 스캐너 정지');
+  toast('스캐너 정지','blue');
+};
+
+async function scanTick(){
+  const sym = watch[Math.floor(Math.random()*watch.length)];
+  const price = (50 + Math.random()*200).toFixed(2);
+  const vol = Math.floor(Math.random()*1000000);
+  
+  // 실제 환경에서는 Alpaca API 호출
+  // const bar = await alpacaBar(sym);
+  
+  // 랜덤 아톰 탐지 (30% 확률)
+  if(Math.random() < 0.3){
+    const detectedAtom = atoms[Math.floor(Math.random()*atoms.length)];
+    const grade = ['A++','A+','B+','C','F'][Math.floor(Math.random()*5)];
+    
+    $('#sidb-log').insertAdjacentHTML('beforeend',
+      `[${new Date().toLocaleTimeString()}] ${sym}: ${detectedAtom.id} (${detectedAtom.name}) | $${price} | Vol: ${vol.toLocaleString()} | 호재: ${grade}\n`
+    );
+    $('#sidb-log').scrollTop = $('#sidb-log').scrollHeight;
+    
+    // SIDB 시트에 기록
+    try{
+      await gsAppend('SIDB!A:H', [Date.now(), new Date().toISOString(), sym, detectedAtom.id, '1m', price, vol, `호재등급:${grade}`]);
+    }catch(e){
+      console.log('SIDB 기록 실패:', e);
+    }
+    
+    // 분자 매칭 (15% 확률)
+    if(Math.random() < 0.15 && grade !== 'F'){
+      const mol = molecules[Math.floor(Math.random()*molecules.length)];
+      signals++;
+      log(`🔥 분자 신호: ${sym} - ${mol.id}`);
+      toast(`🔥 ${sym} 신호!`,'red');
+      
+      // 예측 노트에 기록
+      try{
+        const predId = 'PRED_' + Date.now();
+        const entry = parseFloat(price);
+        const stopLoss = (entry * 0.97).toFixed(2);
+        const takeProfit = (entry * 1.06).toFixed(2);
+        
+        await gsAppend('Prediction_Notes!A:S', [
+          predId, new Date().toISOString(), sym, mol.id, 
+          entry, stopLoss, takeProfit, '2.0', grade, 
+          detectedAtom.id, `${mol.name} 신호 발생`, 
+          '', '', '', '', '', '', '', ''
+        ]);
+      }catch(e){
+        console.log('예측 기록 실패:', e);
+      }
+    }
+  }
+}
+
+/* ▽ 11. 설정 저장 ▽ */
+$('#save-set').onclick=()=>{
+  CFG.ALPACA_KEY = $('#alpaca-key').value.trim();
+  CFG.ALPACA_SEC = $('#alpaca-sec').value.trim();
+  CFG.GEMINI_KEY = $('#gemini-key').value.trim();
+  CFG.SHEET_ID = $('#sheet-id').value.trim();
+  CFG.SHEET_API = $('#sheet-api').value.trim();
+  
+  sessionStorage.setItem('cfg', JSON.stringify(CFG));
+  $('#set-msg').textContent = '✅ 설정 저장 완료';
+  toast('설정 저장 완료');
+  
+  // DB 재로드
+  gsRows().then(()=>{
+    $('#atom-cnt').textContent=atoms.length;
+    $('#mol-cnt').textContent=molecules.length;
+    renderAtomTable();
+    renderPerf();
+  });
+};
+
+/* ▽ 12. Chart.js 동적 로드 ▽ */
+if(!window.Chart){
+  const script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+  script.onload = () => setTimeout(renderPerf, 100);
+  document.head.appendChild(script);
+}
 
 })();

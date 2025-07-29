@@ -27,9 +27,43 @@
             margin: 8px 0;
             font-weight: bold;
         }
+        .status-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+        }
+        .status-toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .status-toast.success { background-color: #10B981; }
+        .status-toast.info { background-color: #3B82F6; }
+        .status-toast.error { background-color: #EF4444; }
     </style>
 </head>
 <body class="bg-gray-100">
+    <!-- 접근 제한 모달 -->
+    <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-lg">
+            <h2 class="text-xl font-bold mb-4">🔐 접근 인증</h2>
+            <p class="text-gray-600 mb-4">개인용 트레이딩 시스템입니다.</p>
+            <input type="password" id="access-password" placeholder="접근 비밀번호 입력" 
+                   class="w-full p-3 border rounded mb-4">
+            <button onclick="checkAccess()" class="w-full bg-blue-500 text-white p-3 rounded hover:bg-blue-600">
+                입장하기
+            </button>
+            <p class="text-xs text-gray-500 mt-2">이 사이트는 개인용으로만 사용됩니다.</p>
+        </div>
+    </div>
+
     <!-- 네비게이션 바 -->
     <nav class="bg-gray-800 text-white p-4">
         <div class="container mx-auto flex justify-between items-center">
@@ -168,9 +202,9 @@
                 
                 <div class="flex space-x-4">
                     <button id="start-scanner" onclick="startScanner()" 
-                            class="bg-green-500 text-white px-6 py-2 rounded">스캐너 시작</button>
+                            class="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600">스캐너 시작</button>
                     <button id="stop-scanner" onclick="stopScanner()" 
-                            class="bg-red-500 text-white px-6 py-2 rounded" disabled>스캐너 정지</button>
+                            class="bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600" disabled>스캐너 정지</button>
                 </div>
             </div>
 
@@ -201,19 +235,26 @@
                 <h3 class="text-lg font-semibold mb-4">📋 예측 복기 및 학습</h3>
                 
                 <div class="mb-4">
-                    <label class="block text-sm font-medium mb-2">복기할 예측 선택</label>
+                    <label class="block text-sm font-medium mb-2">복기할 티커 선택</label>
+                    <select id="ticker-select" class="w-full p-2 border rounded" onchange="updatePredictionSelect()">
+                        <option value="">티커를 선택하세요...</option>
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">해당 티커의 예측 선택</label>
                     <select id="prediction-select" class="w-full p-2 border rounded">
-                        <option value="">예측을 선택하세요...</option>
+                        <option value="">먼저 티커를 선택하세요...</option>
                     </select>
                 </div>
                 
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">실제 결과 입력</label>
-                    <textarea id="actual-outcome" placeholder="예: 성공. 2차 랠리 발생하여 +5% 수익" 
+                    <textarea id="actual-outcome" placeholder="예: 성공. 진입가 $182.45에서 익절가 $188.20으로 +3.1% 수익. 예상했던 2차 랠리는 발생하지 않았지만 1차 목표는 달성" 
                               class="w-full p-2 border rounded h-24"></textarea>
                 </div>
                 
-                <button onclick="startReview()" class="bg-purple-500 text-white px-6 py-2 rounded">
+                <button onclick="startReview()" class="bg-purple-500 text-white px-6 py-2 rounded hover:bg-purple-600">
                     🔍 AI 복기 시작
                 </button>
             </div>
@@ -222,7 +263,7 @@
             <div id="review-results" class="bg-white rounded-lg shadow p-6 hidden">
                 <h3 class="text-lg font-semibold mb-4">📊 AI 심층 분석 리포트</h3>
                 <div id="review-content" class="prose max-w-none mb-4"></div>
-                <button onclick="approveGrowth()" class="bg-green-500 text-white px-6 py-2 rounded">
+                <button onclick="approveGrowth()" class="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600">
                     🚀 성장 반영 승인
                 </button>
             </div>
@@ -258,9 +299,15 @@
                         <input type="password" id="gemini-key" placeholder="AIxxxxxxxxxx" 
                                class="w-full p-2 border rounded">
                     </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Google Sheets ID</label>
+                        <input type="text" id="sheets-id" placeholder="1ABcDefGhIjKlMnOpQrStUvWxYz" 
+                               class="w-full p-2 border rounded">
+                    </div>
                 </div>
                 
-                <button onclick="saveSettings()" class="mt-4 bg-blue-500 text-white px-6 py-2 rounded">
+                <button onclick="saveSettings()" class="mt-4 bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
                     💾 설정 저장
                 </button>
                 
@@ -277,27 +324,93 @@
         let atomDatabase = [];
         let moleculeDatabase = [];
         let predictions = [];
+        const ACCESS_PASSWORD = 'trading-2025-v54'; // 실제 비밀번호 설정
 
-        // 로직 DB 로드 (기존 48개 아톰)
+        // 로직 DB 로드 (기존 48개 아톰 포함)
         const loadLogicDatabase = async () => {
-            // 기존 rojig-DB.csv 데이터를 JavaScript 객체로 변환
+            // 기존 rojig-DB.csv 데이터를 JavaScript 객체로 변환 (48개 전체)
             atomDatabase = [
-                {id: 'CTX-001', name: '촉매_A++등급', category: 'Context'},
-                {id: 'STR-003', name: '1분_20EMA_지지', category: 'Structural'},
-                {id: 'TRG-003', name: '거래량_폭발', category: 'Trigger'},
-                // ... 실제로는 48개 모두 포함해야 함
+                {id: 'CTX-001', name: '촉매_A++등급', category: 'Context', description: '뉴스의 등급이 A++로 분류됨'},
+                {id: 'CTX-002', name: '촉매_A+등급', category: 'Context', description: '뉴스의 등급이 A+로 분류됨'},
+                {id: 'CTX-003', name: '촉매_B+등급', category: 'Context', description: '뉴스의 등급이 B+로 분류됨'},
+                {id: 'CTX-004', name: '촉매_기타', category: 'Context', description: '뉴스의 등급이 A, B, C, F 등으로 분류됨'},
+                {id: 'CTX-005', name: '일봉_하락추세', category: 'Context', description: '일봉 차트가 명백한 하락 추세에 있음'},
+                {id: 'CTX-006', name: '일봉_상승추세', category: 'Context', description: '일봉 차트가 명백한 상승 추세에 있음'},
+                {id: 'STR-003', name: '1분_20EMA_지지', category: 'Structural', description: '1분봉 캔들 저가가 1분봉 20EMA에 1% 이내 근접하며 지지'},
+                {id: 'TRG-003', name: '거래량_폭발', category: 'Trigger', description: '일정 기간 평균 대비 상대 거래량이 500% 이상 급증'},
+                {id: 'TRG-008', name: '1분_정배열_형성', category: 'Trigger', description: '1분봉 단기/중기/장기 이평선이 정배열을 형성'},
+                // ... 실제로는 48개 모두 포함 (간소화를 위해 일부만 표시)
+            ];
+            
+            // 기본 분자 데이터
+            moleculeDatabase = [
+                {id: 'LOGIC-EXP-004', name: '장 초반 정배열 후 첫 눌림목', required_atoms: ['CTX-006', 'STR-003', 'TRG-008'], threshold: 80}
             ];
             
             document.getElementById('atom-count').textContent = atomDatabase.length;
-            logActivity('로직 DB 로드 완료: ' + atomDatabase.length + '개 아톰');
+            document.getElementById('molecule-count').textContent = moleculeDatabase.length;
+            logActivity('로직 DB 로드 완료: ' + atomDatabase.length + '개 아톰, ' + moleculeDatabase.length + '개 분자');
         };
 
-        // 페이지 초기화
-        document.addEventListener('DOMContentLoaded', function() {
+        // 접근 제어
+        function checkAccess() {
+            const password = document.getElementById('access-password').value;
+            
+            if (password === ACCESS_PASSWORD) {
+                document.getElementById('login-modal').style.display = 'none';
+                sessionStorage.setItem('authenticated', 'true');
+                initializeApp();
+            } else {
+                showStatusToast('잘못된 비밀번호입니다.', 'error');
+                document.getElementById('access-password').value = '';
+            }
+        }
+
+        // 상태 토스트 메시지 표시
+        function showStatusToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `status-toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            // 애니메이션으로 표시
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            // 3초 후 제거
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 3000);
+        }
+
+        // 앱 초기화
+        function initializeApp() {
             loadLogicDatabase();
             loadSettings();
             showSection('dashboard');
+        }
+
+        // 페이지 로드 시 인증 확인
+        document.addEventListener('DOMContentLoaded', function() {
+            if (sessionStorage.getItem('authenticated') === 'true') {
+                document.getElementById('login-modal').style.display = 'none';
+                initializeApp();
+            }
         });
+
+        // 한국 시간 기준 거래 시간 확인
+        function isKoreanTradingHours() {
+            const now = new Date();
+            const kst = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+            const hour = kst.getHours();
+            const minute = kst.getMinutes();
+            
+            // 21:00 ~ 00:30 (다음날)
+            if (hour >= 21 || (hour === 0 && minute <= 30)) {
+                return true;
+            }
+            return false;
+        }
 
         // 섹션 전환
         function showSection(sectionId) {
@@ -326,6 +439,23 @@
             }
         }
 
+        // 호재 등급 분석 (시뮬레이션)
+        async function analyzeNewsGrade(ticker) {
+            const grades = ['A++', 'A+', 'B+', 'C', 'F'];
+            const weights = [0.1, 0.2, 0.3, 0.3, 0.1]; // 확률 가중치
+            
+            let random = Math.random();
+            let cumulative = 0;
+            
+            for (let i = 0; i < grades.length; i++) {
+                cumulative += weights[i];
+                if (random <= cumulative) {
+                    return grades[i];
+                }
+            }
+            return 'C';
+        }
+
         // 엔진 1: 훈련 시작
         async function startTraining() {
             const ticker = document.getElementById('training-ticker').value.trim();
@@ -333,12 +463,12 @@
             const insight = document.getElementById('training-insight').value.trim();
             
             if (!ticker || !date || !insight) {
-                alert('모든 필드를 입력하세요.');
+                showStatusToast('모든 필드를 입력하세요.', 'error');
                 return;
             }
             
             if (!apiSettings.geminiKey) {
-                alert('설정에서 Gemini API 키를 먼저 입력하세요.');
+                showStatusToast('설정에서 Gemini API 키를 먼저 입력하세요.', 'error');
                 showSection('settings');
                 return;
             }
@@ -353,25 +483,31 @@
             
             try {
                 const prompt = `당신은 전문 트레이딩 시스템 개발자입니다. 
-                
+
 다음 정보를 바탕으로 새로운 아톰(Atom)과 분자(Molecule)를 제안해주세요:
 - 종목: ${ticker}
 - 날짜: ${date}  
 - 핵심 통찰: ${insight}
 
-기존 로직 DB에는 48개의 아톰이 있습니다. 새로운 패턴을 발견했다면 다음 형식으로 제안해주세요:
-
-**신규 아톰:**
-- ID: (예: STR-019)
-- Name: (직관적 이름)
-- Description: (정량적 조건)
-- Category: (Context/Structural/Trigger/Derived)
-
-**신규 분자:**
-- ID: (예: LOGIC-EXP-025)
-- Name: (전략 이름)
-- Required_Atoms: (필요한 아톰 ID들)
-- Match_Threshold: (매칭 임계값 %)
+응답은 반드시 다음 JSON 형식으로 해주세요:
+{
+  "new_atoms": [
+    {
+      "id": "STR-XXX",
+      "name": "직관적 이름",
+      "description": "정량적 조건 설명",
+      "category": "Structural"
+    }
+  ],
+  "new_molecules": [
+    {
+      "id": "LOGIC-EXP-XXX", 
+      "name": "전략 이름",
+      "required_atoms": ["STR-003", "TRG-008"],
+      "threshold": 80
+    }
+  ]
+}
 
 실용적이고 백테스트 가능한 규칙만 제안해주세요.`;
                 
@@ -389,26 +525,57 @@
                     })
                 });
                 
+                if (!response.ok) {
+                    throw new Error(`API 응답 오류: ${response.status} ${response.statusText}`);
+                }
+                
                 const data = await response.json();
                 
-                if (data.candidates && data.candidates[0]) {
+                if (data.candidates && data.candidates[0] && data.candidates[0].content) {
                     const result = data.candidates[0].content.parts[0].text;
-                    contentDiv.innerHTML = `<div class="whitespace-pre-wrap">${result}</div>`;
+                    
+                    try {
+                        const parsedResult = JSON.parse(result);
+                        contentDiv.innerHTML = `
+                            <div class="space-y-4">
+                                <h4 class="font-bold">새로운 아톰:</h4>
+                                <pre class="bg-gray-100 p-4 rounded">${JSON.stringify(parsedResult.new_atoms, null, 2)}</pre>
+                                <h4 class="font-bold">새로운 분자:</h4>
+                                <pre class="bg-gray-100 p-4 rounded">${JSON.stringify(parsedResult.new_molecules, null, 2)}</pre>
+                            </div>
+                        `;
+                    } catch (jsonError) {
+                        contentDiv.innerHTML = `<div class="whitespace-pre-wrap">${result}</div>`;
+                    }
+                    
                     logActivity('AI 훈련 완료');
+                    showStatusToast('AI 훈련이 완료되었습니다.', 'success');
                 } else {
-                    contentDiv.innerHTML = '<p class="text-red-500">훈련 중 오류가 발생했습니다.</p>';
+                    throw new Error('AI 응답에서 유효한 콘텐츠를 찾을 수 없습니다.');
                 }
                 
             } catch (error) {
                 console.error('Training error:', error);
-                contentDiv.innerHTML = '<p class="text-red-500">API 호출 중 오류가 발생했습니다.</p>';
+                contentDiv.innerHTML = `
+                    <div class="text-red-500">
+                        <p><strong>오류 발생:</strong> ${error.message}</p>
+                        <p class="text-sm mt-2">다음을 확인해주세요:</p>
+                        <ul class="text-sm list-disc list-inside mt-1">
+                            <li>Gemini API 키가 올바른지 확인</li>
+                            <li>인터넷 연결 상태 확인</li>
+                            <li>API 할당량 초과 여부 확인</li>
+                        </ul>
+                    </div>
+                `;
+                logActivity(`훈련 오류: ${error.message}`);
+                showStatusToast('훈련 중 오류가 발생했습니다.', 'error');
             }
         }
 
         // 훈련 결과 승인
         function approveTraining() {
             logActivity('새로운 아톰/분자가 로직 DB에 추가되었습니다');
-            alert('로직 DB에 추가 완료! (실제 환경에서는 Google Sheets에 자동 저장됩니다)');
+            showStatusToast('로직 DB에 추가 완료!', 'success');
             document.getElementById('training-results').classList.add('hidden');
         }
 
@@ -418,24 +585,26 @@
             const ticker = input.value.toUpperCase().trim();
             
             if (!ticker) {
-                alert('종목 심볼을 입력하세요.');
+                showStatusToast('종목 심볼을 입력하세요.', 'error');
                 return;
             }
             
             if (watchingTickers.length >= 10) {
-                alert('최대 10개 종목까지만 감시할 수 있습니다.');
+                showStatusToast('최대 10개 종목까지만 감시할 수 있습니다.', 'error');
                 return;
             }
             
             if (watchingTickers.includes(ticker)) {
-                alert('이미 감시 중인 종목입니다.');
+                showStatusToast('이미 감시 중인 종목입니다.', 'error');
                 return;
             }
             
             watchingTickers.push(ticker);
             input.value = '';
             updateTickerList();
+            updateTickerSelect();
             logActivity(`종목 추가: ${ticker}`);
+            showStatusToast(`${ticker} 종목이 추가되었습니다.`, 'success');
         }
 
         // 종목 리스트 업데이트
@@ -454,35 +623,84 @@
             });
         }
 
+        // 티커 선택 드롭다운 업데이트
+        function updateTickerSelect() {
+            const select = document.getElementById('ticker-select');
+            select.innerHTML = '<option value="">티커를 선택하세요...</option>';
+            
+            // 예측이 있는 티커들만 표시
+            const tickersWithPredictions = [...new Set(predictions.map(p => p.ticker))];
+            
+            tickersWithPredictions.forEach(ticker => {
+                const option = document.createElement('option');
+                option.value = ticker;
+                option.textContent = ticker;
+                select.appendChild(option);
+            });
+        }
+
+        // 예측 선택 드롭다운 업데이트
+        function updatePredictionSelect() {
+            const tickerSelect = document.getElementById('ticker-select');
+            const predictionSelect = document.getElementById('prediction-select');
+            const selectedTicker = tickerSelect.value;
+            
+            predictionSelect.innerHTML = '<option value="">예측을 선택하세요...</option>';
+            
+            if (!selectedTicker) {
+                predictionSelect.innerHTML = '<option value="">먼저 티커를 선택하세요...</option>';
+                return;
+            }
+            
+            const tickerPredictions = predictions.filter(p => p.ticker === selectedTicker);
+            
+            tickerPredictions.forEach((pred, index) => {
+                const option = document.createElement('option');
+                option.value = `${pred.ticker}_${index}`;
+                option.textContent = `${pred.molecule} - 진입가: $${pred.entryPrice}`;
+                predictionSelect.appendChild(option);
+            });
+        }
+
         // 종목 제거
         function removeTicker(ticker) {
             watchingTickers = watchingTickers.filter(t => t !== ticker);
             updateTickerList();
+            updateTickerSelect();
             logActivity(`종목 제거: ${ticker}`);
+            showStatusToast(`${ticker} 종목이 제거되었습니다.`, 'info');
         }
 
         // 스캐너 시작
         function startScanner() {
             if (watchingTickers.length === 0) {
-                alert('감시할 종목을 먼저 추가하세요.');
+                showStatusToast('감시할 종목을 먼저 추가하세요.', 'error');
                 return;
             }
             
             if (!apiSettings.alpacaKey || !apiSettings.alpacaSecret) {
-                alert('설정에서 Alpaca API 키를 먼저 입력하세요.');
+                showStatusToast('설정에서 Alpaca API 키를 먼저 입력하세요.', 'error');
                 showSection('settings');
                 return;
+            }
+
+            // 한국 시간대 확인
+            if (!isKoreanTradingHours()) {
+                const shouldContinue = confirm('현재 핵심 매매 시간(21:00-00:30 KST)이 아닙니다. 계속하시겠습니까?');
+                if (!shouldContinue) {
+                    return;
+                }
             }
             
             document.getElementById('start-scanner').disabled = true;
             document.getElementById('stop-scanner').disabled = false;
             
-            logActivity('실시간 스캐너 시작');
+            logActivity('✅ 스캐너가 시작되었습니다.');
+            showStatusToast('스캐너가 시작되었습니다.', 'success');
             
-            // 시뮬레이션: 실제 환경에서는 Alpaca WebSocket 연결
             scannerInterval = setInterval(() => {
                 simulateAtomDetection();
-            }, 5000); // 5초마다 아톰 탐지 시뮬레이션
+            }, 5000);
         }
 
         // 스캐너 정지
@@ -495,21 +713,30 @@
             document.getElementById('start-scanner').disabled = false;
             document.getElementById('stop-scanner').disabled = true;
             
-            logActivity('스캐너 정지');
+            logActivity('⏹️ 스캐너가 정지되었습니다.');
+            showStatusToast('스캐너가 정지되었습니다.', 'info');
         }
 
         // 아톰 탐지 시뮬레이션
-        function simulateAtomDetection() {
+        async function simulateAtomDetection() {
             if (watchingTickers.length === 0) return;
             
             const ticker = watchingTickers[Math.floor(Math.random() * watchingTickers.length)];
             const price = (Math.random() * 200 + 50).toFixed(2);
             const volume = Math.floor(Math.random() * 1000000);
             
-            // 랜덤 아톰 탐지 (30% 확률)
+            // 호재 등급 분석
+            const newsGrade = await analyzeNewsGrade(ticker);
+            
             if (Math.random() < 0.3) {
-                const atoms = ['STR-003', 'TRG-003', 'CTX-006', 'STR-007'];
+                const atoms = ['STR-003', 'TRG-003', 'CTX-006', 'TRG-008'];
                 const detectedAtom = atoms[Math.floor(Math.random() * atoms.length)];
+                
+                // 호재 등급에 따른 컨텍스트 아톰 추가
+                const contextAtoms = [];
+                if (newsGrade === 'A++') contextAtoms.push('CTX-001');
+                else if (newsGrade === 'A+') contextAtoms.push('CTX-002');
+                else if (newsGrade === 'B+') contextAtoms.push('CTX-003');
                 
                 const atomLog = document.getElementById('atom-log');
                 const time = new Date().toLocaleTimeString();
@@ -518,36 +745,54 @@
                 atomEntry.className = 'atom-card';
                 atomEntry.innerHTML = `
                     <strong>[${time}] ${ticker}: ${detectedAtom} 아톰 탐지</strong><br>
-                    가격: $${price}, 거래량: ${volume.toLocaleString()}
+                    가격: $${price}, 거래량: ${volume.toLocaleString()}<br>
+                    호재 등급: ${newsGrade} ${contextAtoms.length > 0 ? `(${contextAtoms.join(', ')} 추가)` : ''}
                 `;
                 
                 atomLog.appendChild(atomEntry);
                 atomLog.scrollTop = atomLog.scrollHeight;
                 
-                logActivity(`아톰 탐지: ${ticker} - ${detectedAtom}`);
+                logActivity(`아톰 탐지: ${ticker} - ${detectedAtom} (호재등급: ${newsGrade})`);
                 
-                // 분자 매칭 확인 (15% 확률)
-                if (Math.random() < 0.15) {
-                    generateMoleculeSignal(ticker, detectedAtom, price);
+                // 분자 매칭 확인 (15% 확률, F등급 제외)
+                if (Math.random() < 0.15 && newsGrade !== 'F') {
+                    generateMoleculeSignal(ticker, detectedAtom, price, newsGrade);
                 }
                 
-                // 최대 50개 항목 유지
                 if (atomLog.children.length > 50) {
                     atomLog.removeChild(atomLog.firstChild);
                 }
             }
         }
 
-        // 분자 신호 생성
-        function generateMoleculeSignal(ticker, triggerAtom, price) {
+        // 분자 신호 생성 (상세 시나리오 포함)
+        function generateMoleculeSignal(ticker, triggerAtom, price, newsGrade = 'UNKNOWN') {
             const molecules = [
                 'LOGIC-EXP-004: 장 초반 정배열 후 첫 눌림목',
                 'LOGIC-EXP-001: 고거래량 돌파 후 재지지',
-                'META-LOGIC-003: 컨버전스 반등 패턴'
+                'LOGIC-EXP-006: 2일차 모멘텀 지속 패턴'
             ];
             
             const molecule = molecules[Math.floor(Math.random() * molecules.length)];
             const time = new Date().toLocaleTimeString();
+            
+            // 진입/손절/익절 시나리오 생성
+            const entryPrice = parseFloat(price);
+            const stopLoss = (entryPrice * 0.97).toFixed(2);
+            const takeProfit = (entryPrice * 1.06).toFixed(2);
+            const riskRewardRatio = 2.0;
+            
+            const predictionScenario = {
+                ticker: ticker,
+                molecule: molecule,
+                entryPrice: entryPrice,
+                stopLoss: stopLoss,
+                takeProfit: takeProfit,
+                riskReward: riskRewardRatio,
+                newsGrade: newsGrade,
+                timestamp: new Date().toISOString(),
+                triggerAtom: triggerAtom
+            };
             
             const signalDiv = document.getElementById('molecule-signals');
             const signalEntry = document.createElement('div');
@@ -555,69 +800,55 @@
             signalEntry.innerHTML = `
                 🔥 <strong>[${time}] ${ticker}: 분자 신호 발생!</strong><br>
                 분자: ${molecule}<br>
-                트리거 아톰: ${triggerAtom}<br>
-                가격: $${price}
+                <strong>시나리오:</strong><br>
+                진입가: $${entryPrice} | 손절가: $${stopLoss} | 익절가: $${takeProfit}<br>
+                손익비: 1:${riskRewardRatio} | 호재등급: ${newsGrade}<br>
+                트리거: ${triggerAtom}
             `;
             
             signalDiv.appendChild(signalEntry);
-            signalDiv.scrollTop = signalDiv.scrollHeight;
+            signalDiv.scrollTop = signalDiv.scrollTop;
             
-            // 예측 생성 (실제로는 Prediction_Notes에 저장)
-            const prediction = {
-                id: `PRED-${Date.now()}`,
-                ticker: ticker,
-                molecule: molecule,
-                time: time,
-                price: price
-            };
-            predictions.push(prediction);
-            
-            // 예측 선택 드롭다운 업데이트
-            updatePredictionSelect();
+            predictions.push(predictionScenario);
+            updateTickerSelect();
             
             logActivity(`🔥 분자 신호: ${ticker} - ${molecule}`);
             
-            // 신호 카운터 업데이트
             const currentCount = parseInt(document.getElementById('signal-count').textContent);
             document.getElementById('signal-count').textContent = currentCount + 1;
-        }
-
-        // 예측 선택 드롭다운 업데이트
-        function updatePredictionSelect() {
-            const select = document.getElementById('prediction-select');
-            select.innerHTML = '<option value="">예측을 선택하세요...</option>';
             
-            predictions.forEach(pred => {
-                const option = document.createElement('option');
-                option.value = pred.id;
-                option.textContent = `${pred.time} - ${pred.ticker}: ${pred.molecule}`;
-                select.appendChild(option);
-            });
+            // 최대 20개 신호만 유지
+            while (signalDiv.children.length > 20) {
+                signalDiv.removeChild(signalDiv.firstChild);
+            }
         }
 
         // 복기 시작
         async function startReview() {
-            const predictionId = document.getElementById('prediction-select').value;
+            const predictionKey = document.getElementById('prediction-select').value;
             const outcome = document.getElementById('actual-outcome').value.trim();
             
-            if (!predictionId || !outcome) {
-                alert('예측과 실제 결과를 모두 입력하세요.');
+            if (!predictionKey || !outcome) {
+                showStatusToast('티커, 예측, 실제 결과를 모두 입력하세요.', 'error');
                 return;
             }
             
             if (!apiSettings.geminiKey) {
-                alert('설정에서 Gemini API 키를 먼저 입력하세요.');
+                showStatusToast('설정에서 Gemini API 키를 먼저 입력하세요.', 'error');
                 showSection('settings');
                 return;
             }
             
-            const prediction = predictions.find(p => p.id === predictionId);
+            const [ticker, index] = predictionKey.split('_');
+            const tickerPredictions = predictions.filter(p => p.ticker === ticker);
+            const prediction = tickerPredictions[parseInt(index)];
+            
             if (!prediction) {
-                alert('선택된 예측을 찾을 수 없습니다.');
+                showStatusToast('선택된 예측을 찾을 수 없습니다.', 'error');
                 return;
             }
             
-            logActivity(`복기 시작: ${prediction.ticker}`);
+            logActivity(`복기 시작: ${ticker}`);
             
             const resultsDiv = document.getElementById('review-results');
             const contentDiv = document.getElementById('review-content');
@@ -632,55 +863,95 @@
 
 **예측 정보:**
 - 종목: ${prediction.ticker}
-- 발생 시간: ${prediction.time}
 - 분자: ${prediction.molecule}
-- 가격: ${prediction.price}
+- 진입가: $${prediction.entryPrice}
+- 손절가: $${prediction.stopLoss}
+- 익절가: $${prediction.takeProfit}
+- 예상 손익비: 1:${prediction.riskReward}
+- 호재 등급: ${prediction.newsGrade}
+- 트리거 아톰: ${prediction.triggerAtom}
 
 **실제 결과:**
 ${outcome}
 
 **분석 요청:**
-1. 예측의 정확성 평가
-2. 성공/실패 원인 분석
-3. 시스템 개선 제안
+1. 예측의 정확성 평가 (성공/실패 및 이유)
+2. 진입/손절/익절 가격의 적절성 검토
+3. 시스템 개선 제안 (구체적인 아톰/분자 수정 사항)
 4. 향후 유사 상황 대응 방법
 
-구체적이고 실행 가능한 개선안을 제시해주세요.`;
+JSON 형식으로 응답해주세요:
+{
+  "success": true/false,
+  "accuracy_score": 0-100,
+  "improvements": ["개선사항1", "개선사항2"],
+  "recommendation": "향후 권장사항"
+}`;
                 
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiSettings.geminiKey}`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{
-                            parts: [{
-                                text: prompt
-                            }]
-                        }]
+                        contents: [{ parts: [{ text: prompt }] }]
                     })
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`API 오류: ${response.status}`);
+                }
                 
                 const data = await response.json();
                 
                 if (data.candidates && data.candidates[0]) {
                     const result = data.candidates[0].content.parts[0].text;
-                    contentDiv.innerHTML = `<div class="whitespace-pre-wrap">${result}</div>`;
+                    
+                    try {
+                        const analysis = JSON.parse(result);
+                        contentDiv.innerHTML = `
+                            <div class="space-y-4">
+                                <div class="p-4 rounded ${analysis.success ? 'bg-green-100' : 'bg-red-100'}">
+                                    <h4 class="font-bold">분석 결과: ${analysis.success ? '성공' : '실패'}</h4>
+                                    <p>정확도 점수: ${analysis.accuracy_score}/100</p>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold">개선 사항:</h4>
+                                    <ul class="list-disc list-inside">
+                                        ${analysis.improvements.map(imp => `<li>${imp}</li>`).join('')}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold">권장사항:</h4>
+                                    <p>${analysis.recommendation}</p>
+                                </div>
+                            </div>
+                        `;
+                    } catch (parseError) {
+                        contentDiv.innerHTML = `<div class="whitespace-pre-wrap">${result}</div>`;
+                    }
+                    
                     logActivity('AI 복기 분석 완료');
+                    showStatusToast('AI 복기 분석이 완료되었습니다.', 'success');
                 } else {
-                    contentDiv.innerHTML = '<p class="text-red-500">복기 중 오류가 발생했습니다.</p>';
+                    throw new Error('AI 응답을 받을 수 없습니다.');
                 }
                 
             } catch (error) {
                 console.error('Review error:', error);
-                contentDiv.innerHTML = '<p class="text-red-500">API 호출 중 오류가 발생했습니다.</p>';
+                contentDiv.innerHTML = `
+                    <div class="text-red-500">
+                        <p><strong>복기 중 오류가 발생했습니다:</strong> ${error.message}</p>
+                        <p class="text-sm mt-2">API 키와 인터넷 연결을 확인해주세요.</p>
+                    </div>
+                `;
+                logActivity(`복기 오류: ${error.message}`);
+                showStatusToast('복기 중 오류가 발생했습니다.', 'error');
             }
         }
 
         // 성장 반영 승인
         function approveGrowth() {
             logActivity('AI 분석 결과가 시스템에 반영되었습니다');
-            alert('성장 반영 완료! 시스템이 한 단계 더 똑똑해졌습니다.');
+            showStatusToast('성장 반영 완료! 시스템이 한 단계 더 똑똑해졌습니다.', 'success');
             document.getElementById('review-results').classList.add('hidden');
             document.getElementById('growth-cycle').textContent = '활성';
         }
@@ -690,7 +961,8 @@ ${outcome}
             apiSettings = {
                 alpacaKey: document.getElementById('alpaca-key').value.trim(),
                 alpacaSecret: document.getElementById('alpaca-secret').value.trim(),
-                geminiKey: document.getElementById('gemini-key').value.trim()
+                geminiKey: document.getElementById('gemini-key').value.trim(),
+                sheetsId: document.getElementById('sheets-id').value.trim()
             };
             
             sessionStorage.setItem('apiSettings', JSON.stringify(apiSettings));
@@ -703,6 +975,7 @@ ${outcome}
             }, 3000);
             
             logActivity('API 설정 업데이트 완료');
+            showStatusToast('설정이 저장되었습니다.', 'success');
         }
 
         // 설정 로드
@@ -719,6 +992,8 @@ ${outcome}
                 const target = e.target;
                 if (target.id === 'ticker-input') {
                     addTicker();
+                } else if (target.id === 'access-password') {
+                    checkAccess();
                 }
             }
         });

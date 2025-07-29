@@ -4,11 +4,11 @@
   /* ▽ 0. 사용자 설정 (민감 값은 빈칸으로 두기) */
   const CFG = {
     PW         : '2025',   // 로그인 비밀번호 (직접 변경)
-    ALPACA_KEY : 'PKMM3D2Y4KLMQZFC9XJK',       // 클라이언트에 보관 ❌ → 데모에서는 비움
-    ALPACA_SEC : 'ciqIeRyOsPpQwxVIWnjTab05CGnlohkdSolFZmo1',
-    GEMINI_KEY : 'AIzaSyAHylP36yV4AHDlaf9GxQIWzSfU1jHIlDQ',
-    SHEET_ID   : '1TaSyGB-0LY678_-pqmXdrkycQNexauZBJ6fM9SCJXaE',
-    SHEET_API  : 'AIzaSyDbvEEX2OgoWE7ForvvCsZSF3JgQX_cD-U'
+    ALPACA_KEY : '',       // 클라이언트에 보관 ❌ → 데모에서는 비움
+    ALPACA_SEC : '',
+    GEMINI_KEY : '',
+    SHEET_ID   : '',
+    SHEET_API  : ''
   };
 
   /* ▽ 0-B. 백엔드 프록시 경로 (실 운영 시 수정) */

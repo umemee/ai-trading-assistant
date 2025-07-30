@@ -1,10 +1,35 @@
-node_modules/
-.env
-.env.local
-.env.production
-dist/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyd
+*.so
+
+# Distribution / packaging
+.Python
 build/
-*.log
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Python virtualenv
+.venv
+venv/
+ENV/
+
+# Environment variables
+.env
+
+# Operating System files
 .DS_Store
-.vscode/
-coverage/
+Thumbs.db

@@ -1,0 +1,30 @@
+# .github/workflows/deploy.yml 예시
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Create .env file from secrets
+        run: |
+          echo "ALPACA_API_KEY=${{ secrets.ALPACA_API_KEY }}" >> .env
+          echo "ALPACA_SECRET_KEY=${{ secrets.ALPACA_SECRET_KEY }}" >> .env
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+          echo "GOOGLE_SPREADSHEET_ID=${{ secrets.GOOGLE_SPREADSHEET_ID }}" >> .env
+          echo "GOOGLE_SERVICE_ACCOUNT_JSON='${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}'" >> .env
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run tests
+        run: pytest
+      - name: Deploy or Start server
+        run: python main.py # 혹은 uvicorn 등의 명령

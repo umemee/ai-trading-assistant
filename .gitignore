@@ -12,6 +12,7 @@
 !.env.example
 *.key
 *.pem
+*.json
 *.p12
 *.pfx
 config.json

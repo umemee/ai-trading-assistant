@@ -380,4 +380,306 @@ class SheetsService:
                 record = dict(zip(headers, row))
                 
                 # 숫자 필드 변환
-                numeric_fields = ['Total_Trades', 'Win_Rate_%
+                numeric_fields = ['Total_Trades', 'Win_Rate_%', 'Avg_RRR', 
+                                'Avg_Hold_Time_Mins', 'Profit_Factor', 'Confidence_Score']
+                
+                for field in numeric_fields:
+                    try:
+                        record[field] = float(record.get(field, 0))
+                    except ValueError:
+                        record[field] = 0.0
+                
+                performance_data.append(record)
+            
+            logger.info(f"성과 데이터 {len(performance_data)}개 조회")
+            return performance_data
+            
+        except Exception as e:
+            logger.error(f"성과 데이터 조회 실패: {e}")
+            return []
+    
+    async def update_performance_record(self, molecule_id: str, performance_data: Dict) -> bool:
+        """특정 분자의 성과 기록 업데이트"""
+        try:
+            # 현재 성과 데이터 조회
+            current_data = await self.get_performance_data()
+            
+            # 해당 분자 ID 찾기
+            target_row = None
+            for i, record in enumerate(current_data):
+                if record.get('Molecule_ID') == molecule_id:
+                    target_row = i + 2  # 헤더 행 고려
+                    break
+            
+            # 새 레코드인 경우 추가
+            if target_row is None:
+                values = [
+                    molecule_id,
+                    performance_data.get('Total_Trades', 0),
+                    performance_data.get('Win_Rate_%', 0),
+                    performance_data.get('Avg_RRR', 0),
+                    performance_data.get('Avg_Hold_Time_Mins', 0),
+                    performance_data.get('Profit_Factor', 0),
+                    performance_data.get('Confidence_Score', 0),
+                    datetime.now(timezone.utc).isoformat()
+                ]
+                
+                result = self.service.spreadsheets().values().append(
+                    spreadsheetId=self.spreadsheet_id,
+                    range=f"{self.PERFORMANCE_DASHBOARD}!A:H",
+                    valueInputOption='RAW',
+                    body={'values': [values]}
+                ).execute()
+            else:
+                # 기존 레코드 업데이트
+                values = [
+                    molecule_id,
+                    performance_data.get('Total_Trades', 0),
+                    performance_data.get('Win_Rate_%', 0),
+                    performance_data.get('Avg_RRR', 0),
+                    performance_data.get('Avg_Hold_Time_Mins', 0),
+                    performance_data.get('Profit_Factor', 0),
+                    performance_data.get('Confidence_Score', 0),
+                    datetime.now(timezone.utc).isoformat()
+                ]
+                
+                result = self.service.spreadsheets().values().update(
+                    spreadsheetId=self.spreadsheet_id,
+                    range=f"{self.PERFORMANCE_DASHBOARD}!A{target_row}:H{target_row}",
+                    valueInputOption='RAW',
+                    body={'values': [values]}
+                ).execute()
+            
+            logger.info(f"성과 기록 업데이트: {molecule_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"성과 기록 업데이트 실패: {e}")
+            return False
+    
+    # ================== 예측/오답노트 관리 ==================
+    
+    async def add_prediction_record(self, prediction_data: Dict) -> bool:
+        """예측/오답노트에 새 예측 기록 추가"""
+        try:
+            # Prediction_ID 생성 (없는 경우)
+            if 'Prediction_ID' not in prediction_data:
+                prediction_data['Prediction_ID'] = str(uuid.uuid4())
+            
+            # UTC 타임스탬프 생성 (없는 경우)
+            if 'Timestamp_UTC' not in prediction_data:
+                prediction_data['Timestamp_UTC'] = datetime.now(timezone.utc).isoformat()
+            
+            # Key_Atoms_Found 리스트를 문자열로 변환
+            key_atoms = prediction_data.get('Key_Atoms_Found', [])
+            if isinstance(key_atoms, list):
+                key_atoms_str = ', '.join(key_atoms)
+            else:
+                key_atoms_str = str(key_atoms)
+            
+            values = [
+                prediction_data.get('Prediction_ID'),
+                prediction_data.get('Timestamp_UTC'),
+                prediction_data.get('Ticker', ''),
+                prediction_data.get('Triggered_Molecule_ID', ''),
+                prediction_data.get('Prediction_Summary', ''),
+                key_atoms_str,
+                prediction_data.get('Actual_Outcome', ''),
+                prediction_data.get('Human_Feedback', ''),
+                prediction_data.get('AI_Review_Summary', ''),
+                prediction_data.get('Position_Size', ''),
+                prediction_data.get('Overnight_Permission', '')
+            ]
+            
+            result = self.service.spreadsheets().values().append(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.PREDICTION_NOTES}!A:K",
+                valueInputOption='RAW',
+                body={'values': [values]}
+            ).execute()
+            
+            logger.info(f"예측 기록 추가: {prediction_data.get('Ticker')} - {prediction_data.get('Triggered_Molecule_ID')}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"예측 기록 추가 실패: {e}")
+            return False
+    
+    async def get_pending_predictions(self) -> List[Dict]:
+        """아직 결과가 입력되지 않은 예측들 조회"""
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.PREDICTION_NOTES}!A:K"
+            ).execute()
+            
+            values = result.get('values', [])
+            if len(values) < 2:
+                return []
+            
+            headers = values[0]
+            pending_predictions = []
+            
+            for row in values[1:]:
+                while len(row) < len(headers):
+                    row.append('')
+                
+                record = dict(zip(headers, row))
+                
+                # Actual_Outcome이 비어있는 경우만 반환
+                if not record.get('Actual_Outcome', '').strip():
+                    pending_predictions.append(record)
+            
+            logger.info(f"미완료 예측 {len(pending_predictions)}개 조회")
+            return pending_predictions
+            
+        except Exception as e:
+            logger.error(f"미완료 예측 조회 실패: {e}")
+            return []
+    
+    async def update_prediction_outcome(self, prediction_id: str, 
+                                      actual_outcome: str, 
+                                      human_feedback: str = '',
+                                      ai_review_summary: str = '') -> bool:
+        """예측 결과 업데이트"""
+        try:
+            # 현재 예측 노트 데이터 조회
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.PREDICTION_NOTES}!A:K"
+            ).execute()
+            
+            values = result.get('values', [])
+            if len(values) < 2:
+                return False
+            
+            headers = values[0]
+            
+            # 해당 예측 ID 찾기
+            target_row = None
+            for i, row in enumerate(values[1:]):
+                while len(row) < len(headers):
+                    row.append('')
+                
+                if row[0] == prediction_id:  # Prediction_ID는 첫 번째 컬럼
+                    target_row = i + 2  # 헤더 행 고려
+                    break
+            
+            if target_row is None:
+                logger.error(f"예측 ID {prediction_id}를 찾을 수 없습니다")
+                return False
+            
+            # 특정 컬럼만 업데이트
+            updates = [
+                {
+                    'range': f"{self.PREDICTION_NOTES}!G{target_row}",  # Actual_Outcome
+                    'values': [[actual_outcome]]
+                },
+                {
+                    'range': f"{self.PREDICTION_NOTES}!H{target_row}",  # Human_Feedback
+                    'values': [[human_feedback]]
+                },
+                {
+                    'range': f"{self.PREDICTION_NOTES}!I{target_row}",  # AI_Review_Summary
+                    'values': [[ai_review_summary]]
+                }
+            ]
+            
+            # 배치 업데이트 실행
+            body = {
+                'valueInputOption': 'RAW',
+                'data': updates
+            }
+            
+            result = self.service.spreadsheets().values().batchUpdate(
+                spreadsheetId=self.spreadsheet_id,
+                body=body
+            ).execute()
+            
+            logger.info(f"예측 결과 업데이트: {prediction_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"예측 결과 업데이트 실패: {e}")
+            return False
+    
+    # ================== 유틸리티 메서드 ==================
+    
+    async def get_sheet_info(self) -> Dict:
+        """스프레드시트 정보 조회"""
+        try:
+            result = self.service.spreadsheets().get(
+                spreadsheetId=self.spreadsheet_id
+            ).execute()
+            
+            sheets_info = []
+            for sheet in result.get('sheets', []):
+                props = sheet.get('properties', {})
+                sheets_info.append({
+                    'title': props.get('title'),
+                    'sheetId': props.get('sheetId'),
+                    'gridProperties': props.get('gridProperties', {})
+                })
+            
+            return {
+                'title': result.get('properties', {}).get('title'),
+                'sheets': sheets_info
+            }
+            
+        except Exception as e:
+            logger.error(f"시트 정보 조회 실패: {e}")
+            return {}
+    
+    async def backup_data(self) -> Dict:
+        """모든 데이터 백업"""
+        try:
+            backup_data = {
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'atoms': await self.get_atoms(),
+                'molecules': await self.get_molecules(),
+                'sidb_recent': await self.get_recent_sidb_records(hours=168),  # 7일
+                'performance': await self.get_performance_data(),
+                'pending_predictions': await self.get_pending_predictions()
+            }
+            
+            logger.info("데이터 백업 완료")
+            return backup_data
+            
+        except Exception as e:
+            logger.error(f"데이터 백업 실패: {e}")
+            return {}
+
+# 사용 예시
+if __name__ == "__main__":
+    async def test_sheets_service():
+        # 환경 변수에서 설정 로드
+        spreadsheet_id = os.getenv('GOOGLE_SPREADSHEET_ID')
+        service_account_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+        
+        if not spreadsheet_id:
+            print("GOOGLE_SPREADSHEET_ID 환경 변수가 설정되지 않았습니다.")
+            return
+        
+        # 서비스 초기화
+        sheets_service = SheetsService(
+            spreadsheet_id=spreadsheet_id,
+            service_account_json=service_account_json
+        )
+        
+        # 연결 테스트
+        if await sheets_service.test_connection():
+            print("✅ Google Sheets 연결 성공")
+            
+            # 아톰 데이터 조회
+            atoms = await sheets_service.get_atoms()
+            print(f"📊 아톰 {len(atoms)}개 로드")
+            
+            # 분자 데이터 조회
+            molecules = await sheets_service.get_molecules()
+            print(f"🧬 분자 {len(molecules)}개 로드")
+            
+        else:
+            print("❌ Google Sheets 연결 실패")
+    
+    # 테스트 실행
+    asyncio.run(test_sheets_service())

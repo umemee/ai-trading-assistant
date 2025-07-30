@@ -1,305 +1,377 @@
-<!DOCTYPE html>```tml lang="ko">```ead>
-    <meta charset="```-8">
-    <meta```me="viewport" content="width=```ice-width, initial-scale=1.0">
-    <title``` 트레이딩 어시스턴트 ```5</title>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 트레이딩 어시스턴트 V5.5</title>
     
     <!-- 보안 헤더 -->
-    <meta```tp-equiv="Content-Security-Policy"
-          content="default-src 'self' ws:```s:; 
-                   script```c 'self' https```cdn.tailwindcss.com https```cdn.jsdelivr.net;
-                   style-src 'self' 'unsafe-inline' https://cdn```ilwindcss.com https://c```s.cloudflare.com;
-                   font-src https```cdnjs.cloudflare.com;
-                   connect-src 'self' ws```localhost:8000 wss://localhost:8000;">
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self' ws: wss:; 
+                   script-src 'self' https://cdn.tailwindcss.com https://cdn.jsdelivr.net;
+                   style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com;
+                   font-src https://cdnjs.cloudflare.com;
+                   connect-src 'self' ws://localhost:8000 wss://localhost:8000;">
 
     <!-- CDN Libraries -->
-    <script src="https```cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr```t/npm/chart.js"></script>
-    <link href="https://cdnjs.```udflare.com/ajax/libs/font-awesome/6.5.1/css/all.min```s" rel="stylesheet">```  <link href="styles.css" rel="stylesheet">```head>
-<body class="```gray-900 text-white min```screen">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
 
     <!-- 로그인 모달 -->
-    <div i```pw-modal" class="modal```        <div class="modal-box">
-            <div```ass="text-center mb-6">
+    <div id="pw-modal" class="modal">
+        <div class="modal-box">
+            <div class="text-center mb-6">
                 <h2 class="text-2xl font-bold mb-2">🔐 개인용 로그인</h2>
-                ```class="text-gray-400 text-sm">개인용 트레이딩 시```니다.</p>
-                ```class="text-gray-500 text-xs">이 사이트는 개인용``` 사용됩니다.</p>
-            ```iv>
-            ```put id="pw```put" type="password" placeholder="비```를 입력하세요" 
-                   class="input```full mb-4" autocomplete="current-password">
-            ```tton id="pw-btn" class="btn-blue w-full">입장하기</button>
-        ```iv>
-    </div>```   <!-- 상단 네비게이션 (demo1 스타일) -->
+                <p class="text-gray-400 text-sm">개인용 트레이딩 시스템입니다.</p>
+                <p class="text-gray-500 text-xs">이 사이트는 개인용으로만 사용됩니다.</p>
+            </div>
+            <input id="pw-input" type="password" placeholder="비밀번호를 입력하세요" 
+                   class="input w-full mb-4" autocomplete="current-password">
+            <button id="pw-btn" class="btn-blue w-full">입장하기</button>
+        </div>
+    </div>
+
+    <!-- 상단 네비게이션 (demo1 스타일) -->
     <nav class="bg-gray-800 text-white p-4">
-        <div class="container```-auto flex justify-between items-center">
-            <h```lass="text-xl font-bold">AI 트레이딩 어시스턴```5.5</h1>
-            <div class="flex space```4">
-                <button```click="showSection('dashboard')" class="nav-item px-4 py-2 rounded active">
-                    <i class="fas fa-tachometer-alt mr-2"></i>대시보```               </button>
-                ```tton onclick="showSection('module1')" class="nav-item px-4 py-2 rounded">
-                    <i class```as fa-brain mr-2"></i>모듈 1: LogicDiscoverer
-                </button```               <button onclick="show```tion('module2')" class="```-item px-4 py-2 rounded">
-                    ```class="fas fa-search mr-2"></i>모듈 2: SignalScanner```              </button>
-                ```tton onclick="showSection('module3')" class="nav-item px-4 py-2 rounded">
-                    <i class="``` fa-chart-line mr-2"></i>모듈 ```MetaLearner
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">AI 트레이딩 어시스턴트 V5.5</h1>
+            <div class="flex space-x-4">
+                <button onclick="showSection('dashboard')" class="nav-item px-4 py-2 rounded active">
+                    <i class="fas fa-tachometer-alt mr-2"></i>대시보드
                 </button>
-                <button```click="showSection('settings')" class="nav-item px-4 py-2 rounded">
-                    <i class="``` fa-cog mr-2"></i>설정
-                ```utton>
+                <button onclick="showSection('module1')" class="nav-item px-4 py-2 rounded">
+                    <i class="fas fa-brain mr-2"></i>모듈 1: LogicDiscoverer
+                </button>
+                <button onclick="showSection('module2')" class="nav-item px-4 py-2 rounded">
+                    <i class="fas fa-search mr-2"></i>모듈 2: SignalScanner
+                </button>
+                <button onclick="showSection('module3')" class="nav-item px-4 py-2 rounded">
+                    <i class="fas fa-chart-line mr-2"></i>모듈 3: MetaLearner
+                </button>
+                <button onclick="showSection('settings')" class="nav-item px-4 py-2 rounded">
+                    <i class="fas fa-cog mr-2"></i>설정
+                </button>
             </div>
         </div>
-    </nav```    <!-- 메인 컨테이너 -->
-    <div```ass="container mx-auto p-6">
+    </nav>
+
+    <!-- 메인 컨테이너 -->
+    <div class="container mx-auto p-6">
 
         <!-- 대시보드 섹션 -->
-        <div```="dashboard" class="content-section active```            <h2 class="text-2xl font-bold mb-6">📈 종합 대시보드</h```            
+        <div id="dashboard" class="content-section active">
+            <h2 class="text-2xl font-bold mb-6">📈 종합 대시보드</h2>
+            
             <!-- KPI 카드들 -->
-            <div class="```d grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                ```v class="kpi-card bg-gradient```-br from-blue-600 to-blue-800">
-                    <div class="flex```ems-center">
-                        <i```ass="fas fa-broadcast```wer text-2xl text-blue-200 mr-4"></i>
-                        <div```                           <p```ass="text-sm text-blue-200">스캐너```</p>
-                            ```id="scanner-status" class="text``` font-bold status```fline">오프라인</p>
-                ```     </div>
-                    ```iv>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="kpi-card bg-gradient-to-br from-blue-600 to-blue-800">
+                    <div class="flex items-center">
+                        <i class="fas fa-broadcast-tower text-2xl text-blue-200 mr-4"></i>
+                        <div>
+                            <p class="text-sm text-blue-200">스캐너 상태</p>
+                            <p id="scanner-status" class="text-lg font-bold status-offline">오프라인</p>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="k```card bg-gradient-to-br from-green-600 to-green-800">
-                ``` <div class="flex items-center">
-                        <i class```as fa-eye text-2xl text-green-200 mr-4"></i>
+                <div class="kpi-card bg-gradient-to-br from-green-600 to-green-800">
+                    <div class="flex items-center">
+                        <i class="fas fa-eye text-2xl text-green-200 mr-4"></i>
                         <div>
                             <p class="text-sm text-green-200">감시 중인 종목</p>
-                            <p id="watching```unt" class="text-lg font-bold">0</p>
+                            <p id="watching-count" class="text-lg font-bold">0</p>
                         </div>
-                    ```iv>
+                    </div>
                 </div>
                 
-                <div class="k```card bg-gradient-to-br from-yellow-600 to-yellow-800">
-                    <div class="```x items-center">
+                <div class="kpi-card bg-gradient-to-br from-yellow-600 to-yellow-800">
+                    <div class="flex items-center">
                         <i class="fas fa-bell text-2xl text-yellow-200 mr-4"></i>
                         <div>
                             <p class="text-sm text-yellow-200">오늘 신호</p>
-                            ```id="signal-count" class="text-lg font-bold">0</p>
+                            <p id="signal-count" class="text-lg font-bold">0</p>
                         </div>
-                ``` </div>
-                </div```               
-                <div class="kpi-card bg-gradient```-br from-purple-600 to-purple-800">
-                    <div class="```x items-center">
-                        ```class="fas fa-chart-line text-2xl text-purple-200 mr-4"></i>
-                        <div>```                          <p class="text``` text-purple-200">평균 승```p>
-                            ```id="success-rate" class="text-lg font-bold">0%</p>
-                        </div>```                  </div>
+                    </div>
                 </div>
-            </div>```           <!-- 시스템 활동 로그 -->
-            <div class```g-gray-800 rounded-lg shadow p-6">
-                <h3 class="```t-lg font-semibold mb-4">
+                
+                <div class="kpi-card bg-gradient-to-br from-purple-600 to-purple-800">
+                    <div class="flex items-center">
+                        <i class="fas fa-chart-line text-2xl text-purple-200 mr-4"></i>
+                        <div>
+                            <p class="text-sm text-purple-200">평균 승률</p>
+                            <p id="success-rate" class="text-lg font-bold">0%</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 시스템 활동 로그 -->
+            <div class="bg-gray-800 rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold mb-4">
                     <i class="fas fa-list-alt text-green-400 mr-2"></i>
                     최근 시스템 활동
-                ```3>
-                <div i```activity-log" class="log-window h-64 overflow-y-auto bg-gray-900 p-4 rounded">```                  <p```ass="text-gray-500">[시스템 초기화] AI 트레이딩 어시스```V5.5 가동 시작</p>
-                    ```class="text-gray-500">[로직 DB] 48개 아```드 완료</p>
-                ``` <p class="text-gray-500">[대기 중] API 키 설```기...</p>
-                ```iv>
+                </h3>
+                <div id="activity-log" class="log-window h-64 overflow-y-auto bg-gray-900 p-4 rounded">
+                    <p class="text-gray-500">[시스템 초기화] AI 트레이딩 어시스턴트 V5.5 가동 시작</p>
+                    <p class="text-gray-500">[로직 DB] 48개 아톰 로드 완료</p>
+                    <p class="text-gray-500">[대기 중] API 키 설정 대기...</p>
+                </div>
             </div>
 
             <!-- 현재 상태 요약 -->
-            <div class```t-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg```ay-800 rounded-lg p-6">
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-gray-800 rounded-lg p-6">
                     <h3 class="text-lg font-semibold mb-4">
                         <i class="fas fa-eye text-blue-400 mr-2"></i>
-                        현재 감```인 종목:
+                        현재 감시 중인 종목:
                     </h3>
                     <div id="watch-summary" class="text-gray-400">
-                        스캐너를```하여 아톰 탐지를 시작하세```.
+                        스캐너를 시작하여 아톰 탐지를 시작하세요...
                     </div>
-                ```iv>
+                </div>
                 
-                ```v class="bg-gray-800 rounded-lg p-6">
+                <div class="bg-gray-800 rounded-lg p-6">
                     <h3 class="text-lg font-semibold mb-4">
-                        ```class="fas fa-bullseye text-red-400 mr-2"></i>
-                        분자 신```태
+                        <i class="fas fa-bullseye text-red-400 mr-2"></i>
+                        분자 신호 상태
                     </h3>
-                ``` <div id="molecule```atus" class="text-gray-400">
-                        분```호 대기 중...
-                    </div>```              </div>
-            ```iv>
+                    <div id="molecule-status" class="text-gray-400">
+                        분자 신호 대기 중...
+                    </div>
+                </div>
+            </div>
 
             <!-- 보안 안내 -->
-            <div class```t-6 bg-yellow-900 border border-yellow-600 rounded-lg p-4">
+            <div class="mt-6 bg-yellow-900 border border-yellow-600 rounded-lg p-4">
                 <div class="flex items-start">
                     <i class="fas fa-shield-alt text-yellow-400 mr-3 mt-1"></i>
-                    ```v>
-                        <div```ass="text-yellow-200 font-semibold">보안```</div>
-                        ```v class="text-yellow-300 text-sm mt-1">
-                            ```API 키는 브라우저 세션에만``` 저장됩니다. 새로고침 시 재```필요.
+                    <div>
+                        <div class="text-yellow-200 font-semibold">보안 안내</div>
+                        <div class="text-yellow-300 text-sm mt-1">
+                            ⚠️ API 키는 브라우저 세션에만 임시 저장됩니다. 새로고침 시 재입력 필요.
                         </div>
-                ``` </div>
-                </div```           </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- 모듈 1: LogicDiscoverer -->
-        <div id="module1" class="content-section">```          <h2 class="text```l font-bold mb-6">🧠 모듈 1: LogicDiscoverer (AI 패턴 발견```h2>
+        <div id="module1" class="content-section">
+            <h2 class="text-2xl font-bold mb-6">🧠 모듈 1: LogicDiscoverer (AI 패턴 발견)</h2>
             
-            ```v class="bg-gray-800 rounded-lg shadow p-6 mb-6">
-                <h```lass="text-lg font-semibold mb-4">AI 패턴 분석 ```/h3>
-                <div```ass="mb-4">
-                    <input```pe="text" id="analysis-ticker" placeholder="분석할 종목 (예: AAPL)" 
-                           class="input```full mb-2">
-                    <textarea```="analysis-context" placeholder="추```텍스트나 관찰된 패턴을```하세요..." 
-                              class="input```full h-24"></textarea>
-                </div>```              <button onclick="request```lysis()" class="btn-purple px-6 py-2 rounded">```                  <i class="fas fa```ain mr-2"></i>AI``` 요청
-                </button>```          </div>
-
-            <div i```analysis-result" class="bg-gray-800 rounded-lg shadow p-6 hidden">
-                <h3 class="text-lg font-semibold mb-4">AI 분석 결과</h3>
-                <div id="analysis-content" class="prose max-w-none text```ay-300"></div>
+            <div class="bg-gray-800 rounded-lg shadow p-6 mb-6">
+                <h3 class="text-lg font-semibold mb-4">AI 패턴 분석 요청</h3>
+                <div class="mb-4">
+                    <input type="text" id="analysis-ticker" placeholder="분석할 종목 (예: AAPL)" 
+                           class="input w-full mb-2">
+                    <textarea id="analysis-context" placeholder="추가 컨텍스트나 관찰된 패턴을 입력하세요..." 
+                              class="input w-full h-24"></textarea>
+                </div>
+                <button onclick="requestAnalysis()" class="btn-purple px-6 py-2 rounded">
+                    <i class="fas fa-brain mr-2"></i>AI 분석 요청
+                </button>
             </div>
-        </div```        <!-- 모듈 2: SignalScanner -->
-        <div id="module2" class="content-section">```          <h2 class="text```l font-bold mb-6">🔍 모듈 2: SignalScanner```시간 스캐너)</h2>
-            ```          <!-- 스캐너 컨트롤 -->
-            <div class="bg```ay-800 rounded-lg shadow p-6 mb-6">
-                <h3 class="text-lg font-semibold mb-4">실시간 종목 스캐너</h3>
-                ```v class="flex mb-4">
-                    <input```pe="text" id="ticker-input" placeholder="종목 ```(예: AAPL)" 
-                           class="input flex-1 p-2 border rounded-l" maxlength="5">
-                    <button onclick="```Ticker()" class="btn-blue px-6 py-2 rounded-r">
-                        <i class```as fa-plus mr-2"></i>추가
-                    </button>```              </div>
-                ```              <!-- 감시 종목 태그들```>
-                <div class="mb```>
-                    <p class="text-sm text-gray-400 mb-2">감시 중인 종목:</p>```                  <div id="ticker```st" class="flex flex-wrap"></div>
-                </div>```              
-                <!-- 스캐너 제어 버튼 -->
-                <div```ass="flex space-x-4">
-                    ```tton id="start-scanner" onclick```tartScanner()" class="btn-green px-6 py-2 rounded">
-                ```     <i class="fas fa-play mr-2"></i>스캔 시작
-                    ```utton>
-                    <button id="stop-scanner" onclick="```pScanner()" class="btn```d px-6 py-2 rounded" disabled>
-                        <i class```as fa-stop mr-2"></i>스캔 정```                   </button>```              </div>
-            </div```            <!-- 실시간 신호 표시 -->
-            ```v class="bg-gray-800 rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold mb```>실시간 아톰 신호</h3>
-                <div id="signal```splay" class="log-window h-96 overflow-y-auto bg-gray-900 p-4 rounded">
-                    <p class="text-gray-500">스캐너를 시작하면```간 신호가 여기에 표시됩니다...```>
-                </div>```          </div>
-        </div```        <!-- 모듈 3: MetaLearner -->
-        <div id="module```class="content-section">
-            <h2 class="```t-2xl font-bold mb-6">📊 모듈 3: MetaLear``` (성과 분석)</h2>
+
+            <div id="analysis-result" class="bg-gray-800 rounded-lg shadow p-6 hidden">
+                <h3 class="text-lg font-semibold mb-4">AI 분석 결과</h3>
+                <div id="analysis-content" class="prose max-w-none text-gray-300"></div>
+            </div>
+        </div>
+
+        <!-- 모듈 2: SignalScanner -->
+        <div id="module2" class="content-section">
+            <h2 class="text-2xl font-bold mb-6">🔍 모듈 2: SignalScanner (실시간 스캐너)</h2>
             
-            <!-- 성과 요약 카```->
-            <div class```rid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div class="bg```ay-800 rounded-lg p-6 text-center">
-                    ```v id="total-strategies" class="text-3xl font-bold text-blue-400">0</div>
-                    ```v class="text-gray-400">총 전략 수</div>
-                </div```               <div class="bg-gray-800 rounded-lg p-6 text-center">
-                    <div id="avg```nrate" class="text-3xl font-bold text-green-400">0%</div>
-                ``` <div class="text-gray-400">평균 승률</div>
-                </div>```              <div class="bg-gray-800 rounded-lg p-6 text-center">```                  <div id="avg-rrr" class="text-3xl font-bold text-yellow-400">0.0</div>
-                    <div class```ext-gray-400">평균 RRR</div>```              </div>
-                ```v class="bg-gray-800 rounded-lg p-6 text-center">
-                    ```v id="total-trades" class="text-3xl font-bold text-purple-400">0</div>
-                    ```v class="text-gray-400">총 거래 수```iv>
-                </div>```          </div>
+            <!-- 스캐너 컨트롤 -->
+            <div class="bg-gray-800 rounded-lg shadow p-6 mb-6">
+                <h3 class="text-lg font-semibold mb-4">실시간 종목 스캐너</h3>
+                <div class="flex mb-4">
+                    <input type="text" id="ticker-input" placeholder="종목 코드 (예: AAPL)" 
+                           class="input flex-1 p-2 border rounded-l" maxlength="5">
+                    <button onclick="addTicker()" class="btn-blue px-6 py-2 rounded-r">
+                        <i class="fas fa-plus mr-2"></i>추가
+                    </button>
+                </div>
+                
+                <!-- 감시 종목 태그들 -->
+                <div class="mb-4">
+                    <p class="text-sm text-gray-400 mb-2">감시 중인 종목:</p>
+                    <div id="ticker-list" class="flex flex-wrap"></div>
+                </div>
+                
+                <!-- 스캐너 제어 버튼 -->
+                <div class="flex space-x-4">
+                    <button id="start-scanner" onclick="startScanner()" class="btn-green px-6 py-2 rounded">
+                        <i class="fas fa-play mr-2"></i>스캔 시작
+                    </button>
+                    <button id="stop-scanner" onclick="stopScanner()" class="btn-red px-6 py-2 rounded" disabled>
+                        <i class="fas fa-stop mr-2"></i>스캔 정지
+                    </button>
+                </div>
+            </div>
+
+            <!-- 실시간 신호 표시 -->
+            <div class="bg-gray-800 rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold mb-4">실시간 아톰 신호</h3>
+                <div id="signal-display" class="log-window h-96 overflow-y-auto bg-gray-900 p-4 rounded">
+                    <p class="text-gray-500">스캐너를 시작하면 실시간 신호가 여기에 표시됩니다...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 모듈 3: MetaLearner -->
+        <div id="module3" class="content-section">
+            <h2 class="text-2xl font-bold mb-6">📊 모듈 3: MetaLearner (성과 분석)</h2>
+            
+            <!-- 성과 요약 카드 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-gray-800 rounded-lg p-6 text-center">
+                    <div id="total-strategies" class="text-3xl font-bold text-blue-400">0</div>
+                    <div class="text-gray-400">총 전략 수</div>
+                </div>
+                <div class="bg-gray-800 rounded-lg p-6 text-center">
+                    <div id="avg-winrate" class="text-3xl font-bold text-green-400">0%</div>
+                    <div class="text-gray-400">평균 승률</div>
+                </div>
+                <div class="bg-gray-800 rounded-lg p-6 text-center">
+                    <div id="avg-rrr" class="text-3xl font-bold text-yellow-400">0.0</div>
+                    <div class="text-gray-400">평균 RRR</div>
+                </div>
+                <div class="bg-gray-800 rounded-lg p-6 text-center">
+                    <div id="total-trades" class="text-3xl font-bold text-purple-400">0</div>
+                    <div class="text-gray-400">총 거래 수</div>
+                </div>
+            </div>
 
             <!-- 성과 차트 -->
             <div class="bg-gray-800 rounded-lg p-6 mb-8">
-                <h3 class="text-lg font-semibold mb-4">분자별 승```교</h3>
-                ```v class="chart-container">
-                    nvas```="performance```-chart" height="150"></canvas>
-                </div>```          </div>
+                <h3 class="text-lg font-semibold mb-4">분자별 승률 비교</h3>
+                <div class="chart-container">
+                    <canvas id="performance-chart" height="150"></canvas>
+                </div>
+            </div>
 
-            <!-- 성과 테```-->
-            <div```ass="bg-gray-800 rounded-lg overflow-hidden">
-                <div```ass="p-6 border-b border-gray-700">
-                    ``` class="text-lg font-semibold">```성과 데이터</h3>
-                ```iv>
-                <div class```verflow-x-auto">
-                    <table id="performance-table" class="w```ll text-sm">
-                        <thead class```g-gray-700">
+            <!-- 성과 테이블 -->
+            <div class="bg-gray-800 rounded-lg overflow-hidden">
+                <div class="p-6 border-b border-gray-700">
+                    <h3 class="text-lg font-semibold">상세 성과 데이터</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table id="performance-table" class="w-full text-sm">
+                        <thead class="bg-gray-700">
                             <tr>
-                                ``` class="px```py-3 text-left">분자 ID</th>
-                                <th```ass="px-4 py-3 text-center">총 거래</th>
-                                <th class```x-4 py-3 text-center">승```%)</th>
-                                ``` class="px-4 py-3 text-center">```RRR</th>
-                                ``` class="px-4 py-3 text-center">```팩터</th>
-                                ``` class="px-4 py-3 text-center">마```업데이트</th>
-                ```         </tr>
-                        ```head>
-                        <tbody i```performance-tbody">
-                            ```>
-                                <td colspan```" class="px-4 py-8 text-center text-gray-400">
-                                    성과 데이터를``` 중입니다...
-                                </t```                            </tr>```                      </tbody>
+                                <th class="px-4 py-3 text-left">분자 ID</th>
+                                <th class="px-4 py-3 text-center">총 거래</th>
+                                <th class="px-4 py-3 text-center">승률 (%)</th>
+                                <th class="px-4 py-3 text-center">평균 RRR</th>
+                                <th class="px-4 py-3 text-center">수익 팩터</th>
+                                <th class="px-4 py-3 text-center">마지막 업데이트</th>
+                            </tr>
+                        </thead>
+                        <tbody id="performance-tbody">
+                            <tr>
+                                <td colspan="6" class="px-4 py-8 text-center text-gray-400">
+                                    성과 데이터를 로드 중입니다...
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
-                </div>```          </div>
-        </div>```       <!-- 설정 섹션 -->
-        <div```="settings" class="content-section">
+                </div>
+            </div>
+        </div>
+
+        <!-- 설정 섹션 -->
+        <div id="settings" class="content-section">
             <h2 class="text-2xl font-bold mb-6">⚙️ API 설정</h2>
             
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <!-- API 키 설정 -->
                 <div class="bg-gray-800 rounded-lg p-6">
                     <h3 class="text-lg font-semibold mb-6">API 키 관리</h3>
-                    ```v class="space-y-4">
-                        <div>```                          <label class="block```xt-sm font-medium text-gray-300 mb-2">
-                                ```class="fas fa-key text```ue-400 mr-2"></i>Alpaca API Key
-                            </label>
-                ```         <input id="alpaca-key" placeholder```k_live_..." class```nput w-full">
-                        </div>
-                ```     <div>
-                            ```bel class="block text-sm font-medium text-gray-300 mb-2">
-                                ```class="fas fa-lock text```ue-400 mr-2"></i>Alpaca Secret Key
-                            </label>```                          <input id="alpaca-secret" type```assword" placeholder="sk_live```." class="input w-full">
-                        </div>```                      <div>
-                            ```bel class="block text-sm font-medium text-gray-300 mb-2">
-                                ```class="fas fa-robot text-green-400 mr-2"></i>Gemini API Key
-                            </label```                           <input id="```ini-key" placeholder="AI```y..." class="input w-full">
-                        </div>
-                ```     <div>
+                    <div class="space-y-4">
+                        <div>
                             <label class="block text-sm font-medium text-gray-300 mb-2">
-                                ```class="fas fa-table text-yellow-400 mr-2"></i>Google Sheets ID
-                            </label>```                          <input id="sheets```" placeholder="스프레드시```D" class="input w-full">
+                                <i class="fas fa-key text-blue-400 mr-2"></i>Alpaca API Key
+                            </label>
+                            <input id="alpaca-key" placeholder="pk_live_..." class="input w-full">
                         </div>
-                        <div class```lex gap-3 pt-4">
-                            <button onclick="saveSettings``` class="btn-blue flex-1">
-                                <i```ass="fas fa-save mr-2"></i>저장
-                ```         </button>
-                            <button onclick="test```nection()" class="btn-green">
-                                <i class="fas```-plug mr-2"></i>연결 테스트
-                            </button>```                      </div>
-                    ```iv>
-                </div>```               <!-- 연결 상태 -->
-                <div class```g-gray-800 rounded-lg p-6">
-                ``` <h3 class="text``` font-semibold mb```>연결 상태</h3>
-                    ```v class="space-y-4">
-                        <div i```alpaca-status" class="status-card">
-                            <div class="```x items-center justify-between">```                              <div>
-                                    <div class```ext-sm font-medium">```aca Markets</div>
-                                    ```v class="text-xs text-gray-400">실시간 데이터</div>
-                                </div>```                              <div class="status-indicator bg-gray-500"></div>
-                            </div>```                      </div>
-                        <div id="sheets```atus" class="status-card">
-                            <div class="```x items-center justify-between">```                              <div>
-                ```                 <div class="text-sm font-medium">Google Sheets</div>
-                                    ```v class="text-xs text-gray-400">데이터베이스</div>
-                                ```iv>
-                                <div```ass="status-indicator bg-gray-500"></div>
-                            ```iv>
-                        </div```                       <div id="```ini-status" class="status```rd">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
+                                <i class="fas fa-lock text-blue-400 mr-2"></i>Alpaca Secret Key
+                            </label>
+                            <input id="alpaca-secret" type="password" placeholder="sk_live_..." class="input w-full">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
+                                <i class="fas fa-robot text-green-400 mr-2"></i>Gemini API Key
+                            </label>
+                            <input id="gemini-key" placeholder="AIzaSy..." class="input w-full">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">
+                                <i class="fas fa-table text-yellow-400 mr-2"></i>Google Sheets ID
+                            </label>
+                            <input id="sheets-id" placeholder="스프레드시트 ID" class="input w-full">
+                        </div>
+                        <div class="flex gap-3 pt-4">
+                            <button onclick="saveSettings()" class="btn-blue flex-1">
+                                <i class="fas fa-save mr-2"></i>저장
+                            </button>
+                            <button onclick="testConnection()" class="btn-green">
+                                <i class="fas fa-plug mr-2"></i>연결 테스트
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 연결 상태 -->
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">연결 상태</h3>
+                    <div class="space-y-4">
+                        <div id="alpaca-status" class="status-card">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <div class="```t-sm font-medium">```ini AI</div>
-                                    ```v class="text-xs text-gray-400">패턴 분석</div>```                              </div>
-                ```             <div class="status-indicator```-gray-500"></div>```                          </div>
-                ```     </div>
-                    ```iv>
-                </div>```          </div>```           <!-- 설정 상태 메```-->
-            <div```="settings```atus" class="mt```text-sm"></div>
-        </div>```  </div>
+                                    <div class="text-sm font-medium">Alpaca Markets</div>
+                                    <div class="text-xs text-gray-400">실시간 데이터</div>
+                                </div>
+                                <div class="status-indicator bg-gray-500"></div>
+                            </div>
+                        </div>
+                        <div id="sheets-status" class="status-card">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-sm font-medium">Google Sheets</div>
+                                    <div class="text-xs text-gray-400">데이터베이스</div>
+                                </div>
+                                <div class="status-indicator bg-gray-500"></div>
+                            </div>
+                        </div>
+                        <div id="gemini-status" class="status-card">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-sm font-medium">Gemini AI</div>
+                                    <div class="text-xs text-gray-400">패턴 분석</div>
+                                </div>
+                                <div class="status-indicator bg-gray-500"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    <!-- 토스```림 -->
-    <div i```toast" class="toast```/div>
+            <!-- 설정 상태 메시지 -->
+            <div id="settings-status" class="mt-4 text-sm"></div>
+        </div>
+    </div>
 
-    <!-- 메인 스``` -->
-    <script src```pp.js"></script>
+    <!-- 토스트 알림 -->
+    <div id="toast" class="toast"></div>
+
+    <!-- 메인 스크립트 -->
+    <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,22 @@
+{
+  "name": "ai-trading-assistant",
+  "version": "5.5.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "test:unit": "vitest",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:e2e"
+  },
+  "dependencies": {
+    "express": "^4.19.0",
+    "http-proxy-middleware": "^3.0.0",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "vitest": "^1.5.0",
+    "@playwright/test": "^1.44.0"
+  }
+}

@@ -1,36 +1,625 @@
-/* styles.css ― Tailwind 보완 커스텀 CSS */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap");
+/* styles.css ― 완전한 스타일 정의 */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
 
-body           { font-family: 'Inter', sans-serif; }
+/* ══════════════════════════════════════════════════════════════════ */
+/* 기본 스타일 */
+/* ══════════════════════════════════════════════════════════════════ */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-/* 공통 텍스트 */
-.title         { font-size: 1.5rem;  font-weight: 700; margin-bottom: 1rem; }
-.subtitle      { font-size: 1.125rem;font-weight: 600; margin-bottom: 0.5rem; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  color: #f1f5f9;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  min-height: 100vh;
+}
 
-/* 입력·버튼 */
-.input         { border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.5rem; }
-.btn-blue      { background:#2563eb; color:#fff; padding:0.5rem 1.25rem; border-radius:0.375rem; font-weight:600; }
-.btn-green     { background:#16a34a; color:#fff; padding:0.5rem 1.25rem; border-radius:0.375rem; font-weight:600; }
-.btn-red       { background:#dc2626; color:#fff; padding:0.5rem 1.25rem; border-radius:0.375rem; font-weight:600; }
+/* ══════════════════════════════════════════════════════════════════ */
+/* 타이포그래피 */
+/* ══════════════════════════════════════════════════════════════════ */
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #60a5fa, #34d399);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 
-.nav-btn       { font-weight:600; padding:0.5rem 1rem; border-radius:0.375rem; }
-.nav-btn:hover { background:#374151; }
-.nav-btn.active{ background:#2563eb; }
+.subtitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #cbd5e1;
+}
 
-.kpi-card      { background:#fff; padding:1rem; border-radius:0.5rem; box-shadow:0 1px 2px rgba(0,0,0,.05); display:flex; flex-direction:column; align-items:center; gap:0.25rem; }
-.kpi-num       { font-size:1.75rem; font-weight:800; }
+/* ══════════════════════════════════════════════════════════════════ */
+/* 입력 요소 */
+/* ══════════════════════════════════════════════════════════════════ */
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #475569;
+  border-radius: 0.5rem;
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 0.875rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
 
-.log-window    { background:#f8fafc; border:1px solid #e2e8f0; border-radius:0.5rem; padding:0.75rem; font-size:0.8125rem; white-space:pre-wrap; overflow-y:auto; }
+.input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
 
-.modal         { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:9999; }
-.modal-box     { background:#fff; border-radius:0.5rem; padding:2rem; }
+.input::placeholder {
+  color: #64748b;
+}
 
-.toast         { opacity:0; transition:opacity .3s ease; position:fixed; top:1rem; right:1rem; z-index:1000; border-radius:0.5rem; padding:0.75rem 1.25rem; font-weight:600; color:#fff; }
-.toast.show    { opacity:1; }
-.toast.green   { background:#16a34a; }
-.toast.red     { background:#dc2626; }
-.toast.blue    { background:#2563eb; }
+/* ══════════════════════════════════════════════════════════════════ */
+/* 버튼 */
+/* ══════════════════════════════════════════════════════════════════ */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
 
+.btn-blue {
+  @extend .btn-base;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+}
+
+.btn-blue:hover {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.btn-green {
+  @extend .btn-base;
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  color: white;
+}
+
+.btn-green:hover {
+  background: linear-gradient(135deg, #16a34a, #166534);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.btn-red {
+  @extend .btn-base;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.btn-red:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.btn-blue:disabled,
+.btn-green:disabled,
+.btn-red:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 네비게이션 */
+/* ══════════════════════════════════════════════════════════════════ */
+.nav-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #cbd5e1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-btn:hover {
+  background: #374151;
+  color: #f1f5f9;
+}
+
+.nav-btn.active {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* KPI 카드 */
+/* ══════════════════════════════════════════════════════════════════ */
+.kpi-card {
+  background: linear-gradient(135deg, #1e293b, #334155);
+  padding: 1.5rem;
+  border-radius: 1rem;
+  border: 1px solid #475569;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #22c55e, #f59e0b, #ef4444);
+}
+
+.kpi-num {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #f1f5f9;
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 로그 창 */
+/* ══════════════════════════════════════════════════════════════════ */
+.log-window {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #94a3b8;
+  white-space: pre-wrap;
+  overflow-y: auto;
+  max-height: 500px;
+}
+
+.log-window::-webkit-scrollbar {
+  width: 6px;
+}
+
+.log-window::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.log-window::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 모달 */
+/* ══════════════════════════════════════════════════════════════════ */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-box {
+  background: linear-gradient(135deg, #1e293b, #334155);
+  border: 1px solid #475569;
+  border-radius: 1rem;
+  padding: 2rem;
+  width: 24rem;
+  max-width: 90vw;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 토스트 알림 */
+/* ══════════════════════════════════════════════════════════════════ */
+.toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1100;
+  padding: 1rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: white;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast.green {
+  background: linear-gradient(135deg, #22c55e, #15803d);
+}
+
+.toast.red {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.toast.blue {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
 /* 섹션 표시 제어 */
-.sec           { display:none; }
-.sec.active    { display:block; }
+/* ══════════════════════════════════════════════════════════════════ */
+.sec {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.sec.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 테이블 */
+/* ══════════════════════════════════════════════════════════════════ */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  background: #1e293b;
+}
+
+th, td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #334155;
+}
+
+th {
+  background: #374151;
+  font-weight: 600;
+  color: #f1f5f9;
+  position: sticky;
+  top: 0;
+}
+
+tr:hover {
+  background: #2d3748;
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 필터 버튼 */
+/* ══════════════════════════════════════════════════════════════════ */
+.filter-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border: 1px solid #475569;
+  border-radius: 2rem;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.filter-btn.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 워크플로우 다이어그램 */
+/* ══════════════════════════════════════════════════════════════════ */
+.workflow-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.engine-box {
+  width: 100%;
+  max-width: 600px;
+  padding: 1.5rem;
+  border: 2px solid;
+  border-radius: 1rem;
+  position: relative;
+}
+
+.engine-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.engine-header i {
+  font-size: 1.5rem;
+  margin-right: 1rem;
+}
+
+.engine-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.engine-content p {
+  color: #cbd5e1;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.engine-status {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.arrow-down {
+  font-size: 1.5rem;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-10px); }
+  60% { transform: translateY(-5px); }
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 상태 카드 */
+/* ══════════════════════════════════════════════════════════════════ */
+.status-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  transition: all 0.2s;
+}
+
+.status-card:hover {
+  border-color: #475569;
+}
+
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 토글 스위치 */
+/* ══════════════════════════════════════════════════════════════════ */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #475569;
+  transition: 0.4s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #3b82f6;
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 차트 컨테이너 */
+/* ══════════════════════════════════════════════════════════════════ */
+.chart-container {
+  position: relative;
+  background: #0f172a;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  border: 1px solid #334155;
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 종목 태그 */
+/* ══════════════════════════════════════════════════════════════════ */
+.symbol-tag {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, #1e293b, #334155);
+  border: 1px solid #475569;
+  border-radius: 1.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #cbd5e1;
+  margin: 0.25rem;
+}
+
+.symbol-tag .remove-btn {
+  margin-left: 0.5rem;
+  color: #ef4444;
+  cursor: pointer;
+  font-weight: 700;
+  transition: color 0.2s;
+}
+
+.symbol-tag .remove-btn:hover {
+  color: #dc2626;
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 반응형 디자인 */
+/* ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .title {
+    font-size: 1.5rem;
+  }
+  
+  .subtitle {
+    font-size: 1rem;
+  }
+  
+  .kpi-num {
+    font-size: 2rem;
+  }
+  
+  .nav-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+  
+  .modal-box {
+    width: 20rem;
+    padding: 1.5rem;
+  }
+  
+  .workflow-diagram {
+    gap: 0.5rem;
+  }
+  
+  .engine-box {
+    padding: 1rem;
+  }
+  
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    top: auto;
+    bottom: 1rem;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* 유틸리티 클래스 */
+/* ══════════════════════════════════════════════════════════════════ */
+.hidden { display: none !important; }
+.w-full { width: 100%; }
+.text-center { text-align: center; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.space-x-2 > * + * { margin-left: 0.5rem; }
+.space-x-4 > * + * { margin-left: 1rem; }
+.space-y-2 > * + * { margin-top: 0.5rem; }
+.space-y-4 > * + * { margin-top: 1rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mb-6 { margin-bottom: 1.5rem; }
+.mb-8 { margin-bottom: 2rem; }
+.mt-4 { margin-top: 1rem; }
+.mt-6 { margin-top: 1.5rem; }
+.mt-8 { margin-top: 2rem; }
+.mr-2 { margin-right: 0.5rem; }
+.mr-3 { margin-right: 0.75rem; }
+.ml-2 { margin-left: 0.5rem; }
+.p-4 { padding: 1rem; }
+.p-6 { padding: 1.5rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.rounded-lg { border-radius: 0.5rem; }
+.grid { display: grid; }
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.gap-4 { gap: 1rem; }
+.gap-6 { gap: 1.5rem; }
+.gap-8 { gap: 2rem; }
+.overflow-x-auto { overflow-x: auto; }
+
+/* 미디어 쿼리 */
+@media (min-width: 768px) {
+  .md\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .md\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .md\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .lg\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lg\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

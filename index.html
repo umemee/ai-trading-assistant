@@ -3,117 +3,729 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI 트레이딩 어시스턴트 V 5.4</title>
+  <title>AI 트레이딩 어시스턴트 V 5.5</title>
 
-  <!-- 1) 외부 라이브러리 -->
+  <!-- ① CSP : XSS 기본 차단 -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+                 script-src 'self' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://browser.sentry-cdn.com;
+                 style-src  'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com;
+                 font-src   https://fonts.gstatic.com https://cdnjs.cloudflare.com;
+                 img-src    'self' data: https:;
+                 connect-src 'self' https://api.sentry.io;
+                 object-src 'none';">
+
+  <!-- ② Sentry 오류 로깅 -->
+  <script src="https://browser.sentry-cdn.com/7.90.0/bundle.min.js" crossorigin></script>
+  <script>
+    if (typeof Sentry !== 'undefined') {
+      Sentry.init({
+        dsn: 'https://your-dsn@o0.ingest.sentry.io/project-id',
+        tracesSampleRate: 1
+      });
+    }
+  </script>
+
+  <!-- 기본 CDN -->
   <script src="https://cdn.tailwindcss.com" defer></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-        rel="stylesheet" integrity="sha512-yQ8…" crossorigin="anonymous">
+        rel="stylesheet" crossorigin="anonymous">
   <link href="styles.css" rel="stylesheet">
-
-  <!-- 2) 최소 CSP (스크립트 인젝션 방지) -->
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; 
-                 script-src 'self' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; 
-                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; 
-                 font-src https://fonts.gstatic.com;">
-
-  <!-- 3) favicon (선택) -->
-  <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
 </head>
-<body class="bg-gray-100 font-inter">
 
-  <!-- ◇ 1) 로그인 모달 -->
+<body class="bg-gray-900 text-white min-h-screen">
+
+  <!-- 🔐 로그인 모달 -->
   <div id="pw-modal" class="modal">
-    <div class="modal-box w-80">
-      <h2 class="text-xl font-semibold mb-4">🔐 개인용 로그인</h2>
-      <input id="pw-input" type="password" placeholder="비밀번호" class="input mb-4">
+    <div class="modal-box">
+      <div class="text-center mb-6">
+        <h2 class="text-2xl font-bold mb-2">🔐 개인용 로그인</h2>
+        <p class="text-gray-400 text-sm">개인용 트레이딩 시스템입니다.</p>
+        <p class="text-gray-500 text-xs">이 사이트는 개인용으로만 사용됩니다.</p>
+      </div>
+      <input id="pw-input" type="password" placeholder="비밀번호를 입력하세요" 
+             class="input w-full mb-4" autocomplete="current-password">
       <button id="pw-btn" class="btn-blue w-full">입장하기</button>
     </div>
   </div>
 
-  <!-- ◇ 2) 네비게이션 -->
-  <nav class="bg-gray-800 text-white p-4 flex gap-4">
-    <button data-sec="dash"        class="nav-btn">대시보드</button>
-    <button data-sec="explorer"    class="nav-btn">지식 탐색기</button>
-    <button data-sec="performance" class="nav-btn">성과 분석</button>
-    <button data-sec="scan"        class="nav-btn">실시간 스캐너</button>
-    <button data-sec="workflow"    class="nav-btn">워크플로우</button>
-    <button data-sec="set"         class="nav-btn ml-auto">설정</button>
+  <!-- 상단 네비게이션 -->
+  <nav class="bg-gray-800 border-b border-gray-700">
+    <div class="container mx-auto px-4">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center space-x-1">
+          <button data-sec="dashboard" class="nav-btn active">
+            <i class="fas fa-tachometer-alt mr-2"></i>대시보드
+          </button>
+          <button data-sec="explorer" class="nav-btn">
+            <i class="fas fa-search mr-2"></i>지식 탐색기
+          </button>
+          <button data-sec="performance" class="nav-btn">
+            <i class="fas fa-chart-line mr-2"></i>성과 분석
+          </button>
+          <button data-sec="scanner" class="nav-btn">
+            <i class="fas fa-radar mr-2"></i>실시간 스캐너
+          </button>
+          <button data-sec="workflow" class="nav-btn">
+            <i class="fas fa-cogs mr-2"></i>워크플로우
+          </button>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button data-sec="settings" class="nav-btn">
+            <i class="fas fa-cog mr-2"></i>설정
+          </button>
+        </div>
+      </div>
+    </div>
   </nav>
 
-  <!-- ◇ 3) 메인 섹션들 -->
-  <main id="main-area" class="p-6 space-y-8">
+  <!-- 메인 컨테이너 -->
+  <main class="container mx-auto px-4 py-6">
 
-    <!-- 3-1. 종합 대시보드 -->
-    <section id="dash" class="sec active">
-      <h1 class="title">📈 종합 대시보드</h1>
-      <div class="grid md:grid-cols-4 gap-4">
-        <div class="kpi-card"><div id="atom-cnt"  class="kpi-num">0</div><p>정의된 아톰</p></div>
-        <div class="kpi-card"><div id="mol-cnt"   class="kpi-num">0</div><p>구축된 분자</p></div>
-        <div class="kpi-card"><div id="winrate"   class="kpi-num">0%</div><p>평균 승률</p></div>
-        <div class="kpi-card"><div id="trade-cnt" class="kpi-num">0</div><p>총 거래</p></div>
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- 1. 종합 대시보드 -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <section id="dashboard" class="sec active">
+      <div class="mb-8">
+        <h1 class="title flex items-center">
+          <i class="fas fa-tachometer-alt text-blue-400 mr-3"></i>
+          종합 대시보드
+        </h1>
+        <p class="text-gray-400">AI 트레이딩 시스템의 전체 현황을 모니터링합니다.</p>
       </div>
 
-      <h3 class="subtitle mt-8">최근 시스템 활동</h3>
-      <div id="log" class="log-window h-32"></div>
+      <!-- KPI 카드들 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="kpi-card bg-gradient-to-br from-blue-600 to-blue-800">
+          <div class="flex items-center justify-between w-full">
+            <div>
+              <div id="atom-cnt" class="kpi-num">48</div>
+              <div class="text-blue-200">로직 DB 아톰</div>
+            </div>
+            <i class="fas fa-atom text-4xl text-blue-300 opacity-20"></i>
+          </div>
+        </div>
+        
+        <div class="kpi-card bg-gradient-to-br from-green-600 to-green-800">
+          <div class="flex items-center justify-between w-full">
+            <div>
+              <div id="mol-cnt" class="kpi-num">0</div>
+              <div class="text-green-200">구축된 분자</div>
+            </div>
+            <i class="fas fa-molecular text-4xl text-green-300 opacity-20"></i>
+          </div>
+        </div>
+        
+        <div class="kpi-card bg-gradient-to-br from-yellow-600 to-yellow-800">
+          <div class="flex items-center justify-between w-full">
+            <div>
+              <div id="signal-cnt" class="kpi-num">0</div>
+              <div class="text-yellow-200">오늘 신호</div>
+            </div>
+            <i class="fas fa-signal text-4xl text-yellow-300 opacity-20"></i>
+          </div>
+        </div>
+        
+        <div class="kpi-card bg-gradient-to-br from-purple-600 to-purple-800">
+          <div class="flex items-center justify-between w-full">
+            <div>
+              <div id="growth-cycle" class="kpi-num text-lg">준비중</div>
+              <div class="text-purple-200">성장 사이클</div>
+            </div>
+            <i class="fas fa-recycle text-4xl text-purple-300 opacity-20"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- 시스템 활동 로그 -->
+      <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="subtitle flex items-center mb-4">
+          <i class="fas fa-list-alt text-green-400 mr-2"></i>
+          최근 시스템 활동
+        </h3>
+        <div id="log" class="log-window h-48 bg-gray-900 border border-gray-700"></div>
+      </div>
+
+      <!-- 현재 감시 중인 종목 -->
+      <div class="mt-8 bg-gray-800 rounded-lg p-6">
+        <h3 class="subtitle flex items-center mb-4">
+          <i class="fas fa-eye text-blue-400 mr-2"></i>
+          현재 감시 중인 종목:
+        </h3>
+        <div id="watch-summary" class="text-gray-400">
+          스캐너를 시작하여 아톰 탐지를 시작하세요...
+        </div>
+      </div>
+
+      <!-- 분자 신호 상태 -->
+      <div class="mt-6 bg-gray-800 rounded-lg p-6">
+        <h3 class="subtitle flex items-center mb-4">
+          <i class="fas fa-bullseye text-red-400 mr-2"></i>
+          분자 신호 상태
+        </h3>
+        <div id="molecule-status" class="text-gray-400">
+          분자 신호 대기 중...
+        </div>
+      </div>
+
+      <!-- 보안 안내 -->
+      <div class="mt-6 bg-yellow-900 border border-yellow-600 rounded-lg p-4">
+        <div class="flex items-start">
+          <i class="fas fa-shield-alt text-yellow-400 mr-3 mt-1"></i>
+          <div>
+            <div class="text-yellow-200 font-semibold">보안 안내</div>
+            <div class="text-yellow-300 text-sm mt-1">
+              ⚠️ API 키는 브라우저 세션에만 임시 저장됩니다. 새로고침 시 재입력 필요.
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <!-- 3-2. 지식 탐색기 -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- 2. 지식 저장소 탐색기 -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
     <section id="explorer" class="sec">
-      <h1 class="title">📚 지식 저장소 탐색기</h1>
-      <input id="search-atom" placeholder="아톰 / 분자 검색…" class="input w-full mb-4">
-      <div id="atom-table" class="overflow-x-auto"></div>
+      <div class="mb-8">
+        <h1 class="title flex items-center">
+          <i class="fas fa-search text-green-400 mr-3"></i>
+          지식 저장소 탐색기
+        </h1>
+        <p class="text-gray-400">시스템에 저장된 아톰과 분자를 검색하고 탐색합니다.</p>
+      </div>
+
+      <!-- 검색 입력 -->
+      <div class="mb-6">
+        <div class="relative">
+          <input id="search-atom" 
+                 placeholder="아톰 ID, 이름, 카테고리로 검색..." 
+                 class="input w-full pl-10">
+          <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+        </div>
+      </div>
+
+      <!-- 필터 버튼들 -->
+      <div class="mb-6 flex flex-wrap gap-2">
+        <button class="filter-btn active" data-filter="all">
+          <i class="fas fa-list mr-2"></i>전체
+        </button>
+        <button class="filter-btn" data-filter="Context">
+          <i class="fas fa-info-circle mr-2"></i>Context
+        </button>
+        <button class="filter-btn" data-filter="Structural">
+          <i class="fas fa-building mr-2"></i>Structural
+        </button>
+        <button class="filter-btn" data-filter="Trigger">
+          <i class="fas fa-bolt mr-2"></i>Trigger
+        </button>
+      </div>
+
+      <!-- 아톰 테이블 -->
+      <div class="bg-gray-800 rounded-lg overflow-hidden">
+        <div id="atom-table" class="overflow-x-auto"></div>
+      </div>
+
+      <!-- 통계 정보 -->
+      <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-gray-800 rounded-lg p-4 text-center">
+          <div id="context-count" class="text-2xl font-bold text-blue-400">0</div>
+          <div class="text-gray-400 text-sm">Context 아톰</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 text-center">
+          <div id="structural-count" class="text-2xl font-bold text-green-400">0</div>
+          <div class="text-gray-400 text-sm">Structural 아톰</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 text-center">
+          <div id="trigger-count" class="text-2xl font-bold text-red-400">0</div>
+          <div class="text-gray-400 text-sm">Trigger 아톰</div>
+        </div>
+      </div>
     </section>
 
-    <!-- 3-3. 전략 성과 분석 -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- 3. 전략 성과 분석 -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
     <section id="performance" class="sec">
-      <h1 class="title">📊 전략 성과 분석</h1>
-      <canvas id="mol-chart" height="130"></canvas>
-      <table id="perf-table" class="w-full text-sm mt-6 table-auto"></table>
-    </section>
-
-    <!-- 3-4. 실시간 스캐너 -->
-    <section id="scan" class="sec">
-      <h1 class="title">⚡ 실시간 스캐너 (시뮬레이션)</h1>
-      <div class="flex gap-2 mb-4">
-        <input id="sym-input" maxlength="5" placeholder="티커" class="input flex-1">
-        <button id="add-sym"   class="btn-blue">추가</button>
-        <button id="start-scan" class="btn-green">시작</button>
-        <button id="stop-scan"  class="btn-red" disabled>정지</button>
+      <div class="mb-8">
+        <h1 class="title flex items-center">
+          <i class="fas fa-chart-line text-yellow-400 mr-3"></i>
+          전략 성과 분석
+        </h1>
+        <p class="text-gray-400">분자(전략)의 백테스트 결과와 성과를 분석합니다.</p>
       </div>
-      <div id="sym-tags" class="flex flex-wrap gap-2 mb-4"></div>
-      <h3 class="subtitle">SIDB 실시간 로그</h3>
-      <div id="sidb-log" class="log-window h-60"></div>
+
+      <!-- 성과 요약 카드 -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-gray-800 rounded-lg p-6 text-center">
+          <div id="total-strategies" class="text-3xl font-bold text-blue-400">0</div>
+          <div class="text-gray-400">총 전략 수</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-6 text-center">
+          <div id="avg-winrate" class="text-3xl font-bold text-green-400">0%</div>
+          <div class="text-gray-400">평균 승률</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-6 text-center">
+          <div id="avg-rrr" class="text-3xl font-bold text-yellow-400">0.0</div>
+          <div class="text-gray-400">평균 RRR</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-6 text-center">
+          <div id="total-trades" class="text-3xl font-bold text-purple-400">0</div>
+          <div class="text-gray-400">총 거래 수</div>
+        </div>
+      </div>
+
+      <!-- 성과 차트 -->
+      <div class="bg-gray-800 rounded-lg p-6 mb-8">
+        <h3 class="subtitle mb-4">분자별 승률 비교</h3>
+        <div class="chart-container">
+          <canvas id="mol-chart" height="150"></canvas>
+        </div>
+      </div>
+
+      <!-- 성과 테이블 -->
+      <div class="bg-gray-800 rounded-lg overflow-hidden">
+        <div class="p-6 border-b border-gray-700">
+          <h3 class="subtitle">상세 성과 데이터</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table id="perf-table" class="w-full text-sm">
+            <thead class="bg-gray-700">
+              <tr>
+                <th class="px-4 py-3 text-left">분자 ID</th>
+                <th class="px-4 py-3 text-center">총 거래</th>
+                <th class="px-4 py-3 text-center">승률 (%)</th>
+                <th class="px-4 py-3 text-center">평균 RRR</th>
+                <th class="px-4 py-3 text-center">평균 보유시간</th>
+                <th class="px-4 py-3 text-center">Profit Factor</th>
+                <th class="px-4 py-3 text-center">최대 DD</th>
+                <th class="px-4 py-3 text-center">마지막 업데이트</th>
+              </tr>
+            </thead>
+            <tbody id="perf-tbody">
+              <tr>
+                <td colspan="8" class="px-4 py-8 text-center text-gray-400">
+                  성과 데이터를 로드 중입니다...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
-    <!-- 3-5. 시스템 워크플로우 (그림) -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- 4. 실시간 스캐너 -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <section id="scanner" class="sec">
+      <div class="mb-8">
+        <h1 class="title flex items-center">
+          <i class="fas fa-radar text-red-400 mr-3"></i>
+          실시간 스캐너 (시뮬레이션)
+        </h1>
+        <p class="text-gray-400">실시간으로 시장을 스캔하여 아톰을 탐지하고 분자 신호를 생성합니다.</p>
+      </div>
+
+      <!-- 스캐너 컨트롤 -->
+      <div class="bg-gray-800 rounded-lg p-6 mb-6">
+        <div class="flex flex-wrap items-center gap-4 mb-4">
+          <div class="flex-1 min-w-48">
+            <input id="sym-input" 
+                   maxlength="6" 
+                   placeholder="종목 코드 (예: AAPL, TSLA)" 
+                   class="input w-full">
+          </div>
+          <button id="add-sym" class="btn-green">
+            <i class="fas fa-plus mr-2"></i>추가
+          </button>
+          <div class="flex gap-2">
+            <button id="start-scan" class="btn-blue">
+              <i class="fas fa-play mr-2"></i>시작
+            </button>
+            <button id="stop-scan" class="btn-red" disabled>
+              <i class="fas fa-stop mr-2"></i>정지
+            </button>
+          </div>
+        </div>
+
+        <!-- 감시 종목 태그들 -->
+        <div class="mb-4">
+          <div class="text-sm text-gray-400 mb-2">감시 중인 종목:</div>
+          <div id="sym-tags" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- 스캐너 상태 -->
+        <div class="flex items-center justify-between text-sm">
+          <div class="flex items-center">
+            <div id="scanner-status" class="w-3 h-3 bg-gray-500 rounded-full mr-2"></div>
+            <span id="scanner-text">대기 중</span>
+          </div>
+          <div class="text-gray-400">
+            마지막 스캔: <span id="last-scan">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 스캔 결과 요약 -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-gray-800 rounded-lg p-4 text-center">
+          <div id="atoms-detected" class="text-2xl font-bold text-blue-400">0</div>
+          <div class="text-gray-400 text-sm">탐지된 아톰</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 text-center">
+          <div id="signals-generated" class="text-2xl font-bold text-green-400">0</div>
+          <div class="text-gray-400 text-sm">생성된 신호</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 text-center">
+          <div id="high-grade-signals" class="text-2xl font-bold text-yellow-400">0</div>
+          <div class="text-gray-400 text-sm">고등급 신호</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 text-center">
+          <div id="active-molecules" class="text-2xl font-bold text-purple-400">0</div>
+          <div class="text-gray-400 text-sm">활성 분자</div>
+        </div>
+      </div>
+
+      <!-- SIDB 실시간 로그 -->
+      <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="subtitle flex items-center mb-4">
+          <i class="fas fa-terminal text-green-400 mr-2"></i>
+          SIDB 실시간 로그
+        </h3>
+        <div id="sidb-log" class="log-window h-80 bg-gray-900 border border-gray-700 font-mono text-xs"></div>
+        <div class="flex justify-between items-center mt-4 text-sm text-gray-400">
+          <div>
+            총 <span id="log-count">0</span>개 로그 항목
+          </div>
+          <button id="clear-log" class="text-red-400 hover:text-red-300">
+            <i class="fas fa-trash mr-1"></i>로그 지우기
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- 5. 시스템 워크플로우 -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
     <section id="workflow" class="sec">
-      <h1 class="title">🧩 시스템 워크플로우</h1>
-      <img src="https://i.imgur.com/WHeX9LU.png"
-           alt="workflow-diagram" class="w-full rounded shadow">
+      <div class="mb-8">
+        <h1 class="title flex items-center">
+          <i class="fas fa-cogs text-purple-400 mr-3"></i>
+          시스템 워크플로우
+        </h1>
+        <p class="text-gray-400">AI 트레이딩 시스템의 4가지 핵심 엔진과 데이터 흐름을 시각화합니다.</p>
+      </div>
+
+      <!-- 워크플로우 다이어그램 -->
+      <div class="bg-gray-800 rounded-lg p-8 mb-8">
+        <div class="workflow-diagram">
+          <!-- Engine 1: LogicDiscoverer -->
+          <div class="engine-box bg-blue-900 border-blue-400">
+            <div class="engine-header">
+              <i class="fas fa-brain text-blue-400"></i>
+              <h3>Engine 1: LogicDiscoverer</h3>
+            </div>
+            <div class="engine-content">
+              <p>시장 데이터와 Gemini AI를 활용하여 새로운 거래 패턴을 발견하고 아톰을 생성합니다.</p>
+              <div class="engine-status">
+                <span class="status-dot bg-yellow-400"></span>
+                <span>개발 중</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 화살표 -->
+          <div class="arrow-down">
+            <i class="fas fa-arrow-down text-gray-400"></i>
+          </div>
+
+          <!-- Engine 2: SignalScanner -->
+          <div class="engine-box bg-green-900 border-green-400">
+            <div class="engine-header">
+              <i class="fas fa-search text-green-400"></i>
+              <h3>Engine 2: SignalScanner</h3>
+            </div>
+            <div class="engine-content">
+              <p>실시간 Alpaca 데이터를 스캔하여 아톰을 탐지하고 분자 신호를 생성합니다.</p>
+              <div class="engine-status">
+                <span class="status-dot bg-green-400"></span>
+                <span>활성</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 화살표 -->
+          <div class="arrow-down">
+            <i class="fas fa-arrow-down text-gray-400"></i>
+          </div>
+
+          <!-- Engine 3: MetaLearner -->
+          <div class="engine-box bg-purple-900 border-purple-400">
+            <div class="engine-header">
+              <i class="fas fa-graduation-cap text-purple-400"></i>
+              <h3>Engine 3: MetaLearner</h3>
+            </div>
+            <div class="engine-content">
+              <p>과거 거래 데이터를 분석하여 전략의 성과를 평가하고 개선점을 도출합니다.</p>
+              <div class="engine-status">
+                <span class="status-dot bg-yellow-400"></span>
+                <span>부분 활성</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 화살표 -->
+          <div class="arrow-down">
+            <i class="fas fa-arrow-down text-gray-400"></i>
+          </div>
+
+          <!-- Engine 4: DataManager -->
+          <div class="engine-box bg-red-900 border-red-400">
+            <div class="engine-header">
+              <i class="fas fa-database text-red-400"></i>
+              <h3>Engine 4: DataManager</h3>
+            </div>
+            <div class="engine-content">
+              <p>Google Sheets와 연동하여 모든 데이터를 저장하고 관리합니다.</p>
+              <div class="engine-status">
+                <span class="status-dot bg-green-400"></span>
+                <span>활성</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 데이터 흐름 설명 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-gray-800 rounded-lg p-6">
+          <h3 class="subtitle flex items-center mb-4">
+            <i class="fas fa-stream text-blue-400 mr-2"></i>
+            데이터 입력
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-center">
+              <i class="fas fa-check text-green-400 mr-2"></i>
+              Alpaca Markets 실시간 데이터
+            </li>
+            <li class="flex items-center">
+              <i class="fas fa-check text-green-400 mr-2"></i>
+              Google Sheets 아톰/분자 DB
+            </li>
+            <li class="flex items-center">
+              <i class="fas fa-times text-red-400 mr-2"></i>
+              Gemini AI 패턴 분석 (개발 중)
+            </li>
+            <li class="flex items-center">
+              <i class="fas fa-check text-green-400 mr-2"></i>
+              사용자 설정 및 감시 종목
+            </li>
+          </ul>
+        </div>
+
+        <div class="bg-gray-800 rounded-lg p-6">
+          <h3 class="subtitle flex items-center mb-4">
+            <i class="fas fa-output text-yellow-400 mr-2"></i>
+            데이터 출력
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-center">
+              <i class="fas fa-check text-green-400 mr-2"></i>
+              실시간 아톰 탐지 로그
+            </li>
+            <li class="flex items-center">
+              <i class="fas fa-check text-green-400 mr-2"></i>
+              분자 신호 알림
+            </li>
+            <li class="flex items-center">
+              <i class="fas fa-check text-green-400 mr-2"></i>
+              성과 분석 리포트
+            </li>
+            <li class="flex items-center">
+              <i class="fas fa-times text-red-400 mr-2"></i>
+              자동 거래 실행 (미구현)
+            </li>
+          </ul>
+        </div>
+      </div>
     </section>
 
-    <!-- 3-6. 설정 -->
-    <section id="set" class="sec">
-      <h1 class="title">⚙️ API 설정</h1>
-      <div class="grid gap-4 max-w-xl">
-        <input id="alpaca-key" placeholder="Alpaca API Key"   class="input">
-        <input id="alpaca-sec" placeholder="Alpaca Secret"     class="input">
-        <input id="gemini-key" placeholder="Gemini Key"        class="input">
-        <input id="sheet-id"   placeholder="Google Sheets ID"  class="input">
-        <input id="sheet-api"  placeholder="Sheets API Key"    class="input">
-        <button id="save-set"  class="btn-blue mt-2">저장</button>
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- 6. 설정 -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <section id="settings" class="sec">
+      <div class="mb-8">
+        <h1 class="title flex items-center">
+          <i class="fas fa-cog text-gray-400 mr-3"></i>
+          API 설정
+        </h1>
+        <p class="text-gray-400">외부 서비스 연동을 위한 API 키를 설정합니다.</p>
       </div>
-      <p id="set-msg" class="mt-2 text-sm text-green-600"></p>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- API 키 설정 -->
+        <div class="bg-gray-800 rounded-lg p-6">
+          <h3 class="subtitle mb-6">API 키 관리</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                <i class="fas fa-key text-blue-400 mr-2"></i>
+                Alpaca API Key
+              </label>
+              <input id="alpaca-key" 
+                     placeholder="pk_live_..." 
+                     class="input w-full"
+                     autocomplete="off">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                <i class="fas fa-lock text-blue-400 mr-2"></i>
+                Alpaca Secret Key
+              </label>
+              <input id="alpaca-sec" 
+                     type="password"
+                     placeholder="sk_live_..." 
+                     class="input w-full"
+                     autocomplete="off">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                <i class="fas fa-robot text-green-400 mr-2"></i>
+                Gemini API Key
+              </label>
+              <input id="gemini-key" 
+                     placeholder="AIzaSy..." 
+                     class="input w-full"
+                     autocomplete="off">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                <i class="fas fa-table text-yellow-400 mr-2"></i>
+                Google Sheets ID
+              </label>
+              <input id="sheet-id" 
+                     placeholder="스프레드시트 ID" 
+                     class="input w-full"
+                     autocomplete="off">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                <i class="fas fa-key text-yellow-400 mr-2"></i>
+                Sheets API Key
+              </label>
+              <input id="sheet-api" 
+                     placeholder="AIzaSy..." 
+                     class="input w-full"
+                     autocomplete="off">
+            </div>
+            <div class="flex gap-3 pt-4">
+              <button id="save-set" class="btn-blue flex-1">
+                <i class="fas fa-save mr-2"></i>저장
+              </button>
+              <button id="test-connection" class="btn-green">
+                <i class="fas fa-plug mr-2"></i>연결 테스트
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 시스템 설정 -->
+        <div class="bg-gray-800 rounded-lg p-6">
+          <h3 class="subtitle mb-6">시스템 설정</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                스캔 간격 (초)
+              </label>
+              <select id="scan-interval" class="input w-full">
+                <option value="15">15초</option>
+                <option value="30">30초</option>
+                <option value="60">1분</option>
+                <option value="300">5분</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                로그 보관 기간
+              </label>
+              <select id="log-retention" class="input w-full">
+                <option value="1">1시간</option>
+                <option value="24">24시간</option>
+                <option value="168">1주일</option>
+                <option value="720">1개월</option>
+              </select>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-300">알림 활성화</span>
+              <label class="toggle">
+                <input type="checkbox" id="notifications-enabled" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-300">다크 모드</span>
+              <label class="toggle">
+                <input type="checkbox" id="dark-mode" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 설정 상태 메시지 -->
+      <div class="mt-6">
+        <div id="set-msg" class="hidden bg-green-900 border border-green-400 rounded-lg p-4">
+          <div class="flex items-center">
+            <i class="fas fa-check-circle text-green-400 mr-2"></i>
+            <span class="text-green-200">설정이 성공적으로 저장되었습니다.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 연결 상태 -->
+      <div class="mt-6 bg-gray-800 rounded-lg p-6">
+        <h3 class="subtitle mb-4">연결 상태</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div id="alpaca-status" class="status-card">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-medium">Alpaca Markets</div>
+                <div class="text-xs text-gray-400">거래소 데이터</div>
+              </div>
+              <div class="status-indicator bg-gray-500"></div>
+            </div>
+          </div>
+          <div id="sheets-status" class="status-card">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-medium">Google Sheets</div>
+                <div class="text-xs text-gray-400">데이터베이스</div>
+              </div>
+              <div class="status-indicator bg-gray-500"></div>
+            </div>
+          </div>
+          <div id="gemini-status" class="status-card">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-medium">Gemini AI</div>
+                <div class="text-xs text-gray-400">패턴 분석</div>
+              </div>
+              <div class="status-indicator bg-gray-500"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
   </main>
 
-  <!-- ◇ 4) 전역 토스트 -->
+  <!-- 전역 토스트 알림 -->
   <div id="toast" class="toast"></div>
 
-  <!-- ◇ 5) 핵심 로직 -->
+  <!-- Chart.js 동적 로딩 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  
+  <!-- 메인 스크립트 -->
   <script src="app.js" type="module"></script>
 </body>
 </html>

@@ -264,59 +264,59 @@ class GeminiService:
     # gemini_service.py의 _parse_pattern_analysis_response 메서드 수정
     def _parse_pattern_analysis_response(self, response_text: str) -> Dict:
     """패턴 분석 응답 파싱 - 검역 시스템 적용"""
-    try:
-        # JSON 부분 추출
-        json_match = re.search(r'``````', response_text, re.DOTALL)
-        if not json_match:
-            json_match = re.search(r'(\{.*\})', response_text, re.DOTALL)
+        try:
+            # JSON 부분 추출
+            json_match = re.search(r'``````', response_text, re.DOTALL)
+            if not json_match:
+                json_match = re.search(r'(\{.*\})', response_text, re.DOTALL)
 
-        if json_match:
-            json_str = json_match.group(1)
-            result = json.loads(json_str)
+            if json_match:
+                json_str = json_match.group(1)
+                result = json.loads(json_str)
 
-            # 결과 검증
-            if not self._validate_pattern_analysis_result(result):
-                raise ValueError("응답 형식이 올바르지 않습니다")
+                # 결과 검증
+                if not self._validate_pattern_analysis_result(result):
+                    raise ValueError("응답 형식이 올바르지 않습니다")
 
-            # ⭐ 검역 시스템 적용: 모든 신규 분자를 quarantined 상태로 설정
-            if 'suggested_molecule' in result and result['suggested_molecule']:
-                result['suggested_molecule']['Status'] = 'quarantined'
-                result['suggested_molecule']['Created_Date'] = datetime.now(timezone.utc).isoformat()
-                result['suggested_molecule']['WFO_Score'] = 0.0
-                result['suggested_molecule']['Approved_Date'] = ''
-                result['suggested_molecule']['Approved_By'] = ''
+                # ⭐ 검역 시스템 적용: 모든 신규 분자를 quarantined 상태로 설정
+                if 'suggested_molecule' in result and result['suggested_molecule']:
+                    result['suggested_molecule']['Status'] = 'quarantined'
+                    result['suggested_molecule']['Created_Date'] = datetime.now(timezone.utc).isoformat()
+                    result['suggested_molecule']['WFO_Score'] = 0.0
+                    result['suggested_molecule']['Approved_Date'] = ''
+                    result['suggested_molecule']['Approved_By'] = ''
                 
-                logger.info(f"새 분자를 검역소에 추가: {result['suggested_molecule'].get('molecule_id')}")
+                    logger.info(f"새 분자를 검역소에 추가: {result['suggested_molecule'].get('molecule_id')}")
 
-            result['success'] = True
-            result['raw_response'] = response_text
-            return result
+                result['success'] = True
+                result['raw_response'] = response_text
+                return result
 
-        else:
-            # JSON이 없는 경우 텍스트 분석 결과로 반환
+            else:
+                # JSON이 없는 경우 텍스트 분석 결과로 반환
+                return {
+                    'success': True,
+                    'analysis': response_text,
+                    'suggested_atoms': [],
+                    'suggested_molecule': None,
+                    'raw_response': response_text
+                }
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON 파싱 실패: {e}")
             return {
-                'success': True,
-                'analysis': response_text,
-                'suggested_atoms': [],
-                'suggested_molecule': None,
+                'success': False,
+                'error': f"JSON 파싱 오류: {str(e)}",
                 'raw_response': response_text
             }
-
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON 파싱 실패: {e}")
-        return {
-            'success': False,
-            'error': f"JSON 파싱 오류: {str(e)}",
-            'raw_response': response_text
-        }
-
-    except Exception as e:
-        logger.error(f"응답 파싱 실패: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'raw_response': response_text
-        }
+    
+        except Exception as e:
+            logger.error(f"응답 파싱 실패: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'raw_response': response_text
+            }
     
     def _validate_pattern_analysis_result(self, result: Dict) -> bool:
         """패턴 분석 결과 검증"""

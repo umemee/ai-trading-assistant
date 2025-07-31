@@ -262,7 +262,7 @@ class GeminiService:
             return "차트 데이터 요약 생성 중 오류가 발생했습니다."
   
     # gemini_service.py의 _parse_pattern_analysis_response 메서드 수정
- def _parse_pattern_analysis_response(self, response_text: str) -> Dict:
+    def _parse_pattern_analysis_response(self, response_text: str) -> Dict:
     """패턴 분석 응답 파싱 - 검역 시스템 적용"""
     try:
         # JSON 부분 추출

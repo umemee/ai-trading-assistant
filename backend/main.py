@@ -11,7 +11,7 @@ main.py - AI Trading Assistant V5.1 Complete Backend Server
 - WebSocket 실시간 통신
 - 완전한 에러 처리 및 로깅
 """
-
+from environment_manager import get_env_manager, get_current_env
 import asyncio
 import json
 import logging
@@ -128,85 +128,61 @@ class TradingSystemCore:
         
         logger.info("TradingSystemCore 초기화 완료")
     
-    async def initialize_services(self, api_settings: Dict[str, str]) -> Dict[str, bool]:
-        """모든 서비스 초기화"""
-        initialization_results = {}
-        
+    # main.py의 서비스 초기화 부분 수정
+    async def initialize_services():
+        """서비스 초기화 - 환경별 설정 적용"""
+        global sheets_service, alpaca_service, gemini_service
+        global signal_scanner, atom_detector, molecule_matcher
+    
         try:
-            # 1. Google Sheets 서비스 초기화
-            if api_settings.get('sheetsId') and api_settings.get('googleServiceAccountJson'):
-                try:
-                    self.sheets_service = SheetsService(
-                        spreadsheet_id=api_settings['sheetsId'],
-                        service_account_json=api_settings['googleServiceAccountJson']
-                    )
-                    connection_ok = await self.sheets_service.test_connection()
-                    initialization_results['sheets'] = connection_ok
-                    logger.info("Google Sheets 서비스 초기화 완료")
-                except Exception as e:
-                    logger.error(f"Google Sheets 초기화 실패: {e}")
-                    initialization_results['sheets'] = False
-            
-            # 2. Gemini AI 서비스 초기화
-            if api_settings.get('geminiKey'):
-                try:
-                    self.gemini_service = GeminiService(api_key=api_settings['geminiKey'])
-                    connection_ok = await self.gemini_service.test_connection()
-                    initialization_results['gemini'] = connection_ok
-                    logger.info("Gemini AI 서비스 초기화 완료")
-                except Exception as e:
-                    logger.error(f"Gemini AI 초기화 실패: {e}")
-                    initialization_results['gemini'] = False
-            
-            # 3. Alpaca 서비스 초기화
-            if api_settings.get('alpacaKey') and api_settings.get('alpacaSecret'):
-                try:
-                    self.alpaca_service = AlpacaService(
-                        api_key=api_settings['alpacaKey'],
-                        secret_key=api_settings['alpacaSecret'],
-                        paper=True
-                    )
-                    connection_ok = await self.alpaca_service.test_connection()
-                    initialization_results['alpaca'] = connection_ok
-                    logger.info("Alpaca 서비스 초기화 완료")
-                except Exception as e:
-                    logger.error(f"Alpaca 초기화 실패: {e}")
-                    initialization_results['alpaca'] = False
-            
-            # 4. 기술적 지표 계산기 초기화
-            self.technical_indicators = TechnicalIndicators()
-            initialization_results['technical_indicators'] = True
-            logger.info("기술적 지표 계산기 초기화 완료")
-            
-            # 5. 아톰 탐지기 초기화
-            self.atom_detector = AtomDetector(sheets_service=self.sheets_service)
-            await self.atom_detector.initialize()
-            initialization_results['atom_detector'] = True
-            logger.info("아톰 탐지기 초기화 완료")
-            
-            # 6. 분자 매칭기 초기화
-            self.molecule_matcher = MoleculeMatcher(sheets_service=self.sheets_service)
-            await self.molecule_matcher.initialize()
-            initialization_results['molecule_matcher'] = True
-            logger.info("분자 매칭기 초기화 완료")
-            
-            # 7. 기존 시그널 스캐너 초기화 (호환성)
-            if self.alpaca_service:
-                self.signal_scanner = SignalScanner(
-                    alpaca_service=self.alpaca_service,
-                    sheets_service=self.sheets_service
-                )
-                initialization_results['signal_scanner'] = True
-                logger.info("시그널 스캐너 초기화 완료")
-            
-            self.is_initialized = True
-            logger.info("모든 서비스 초기화 완료")
+            # 환경 설정 로드
+            env_manager = get_env_manager()
+            env_config = get_current_env()
+        
+            # 환경 검증
+            validation = env_manager.validate_environment()
+            if not validation['valid']:
+                logger.error("환경 설정이 올바르지 않습니다:")
+                for issue in validation['issues']:
+                    logger.error(f"  - {issue}")
+                raise Exception("환경 설정 오류")
+        
+            if validation['warnings']:
+                for warning in validation['warnings']:
+                    logger.warning(f"  - {warning}")
+        
+            logger.info(f"🏗️ {env_config.name.upper()} 환경으로 시작")
+        
+            # Google Sheets 서비스 (환경별 시트 ID 사용)
+            sheets_service = SheetsService(
+                spreadsheet_id=env_config.sheets_id,
+                credentials_path="credentials.json"
+            )
+        
+            # Alpaca 서비스 (환경별 설정 사용)
+            alpaca_config = env_manager.get_alpaca_config()
+            alpaca_service = AlpacaService(
+                api_key=alpaca_config['api_key'],
+                secret_key=alpaca_config['secret_key'],
+                base_url=alpaca_config['base_url']
+            )
+        
+            # Gemini 서비스 (환경별 API 키 사용)
+            gemini_service = GeminiService(
+                api_key=env_config.gemini_api_key,
+                debug_mode=env_config.debug_mode
+            )
+        
+            # 나머지 서비스들 초기화
+            atom_detector = AtomDetector(sheets_service)
+            molecule_matcher = MoleculeMatcher(sheets_service)
+            signal_scanner = SignalScanner(sheets_service, alpaca_service)
+        
+            logger.info("✅ 모든 서비스 초기화 완료")
             
         except Exception as e:
-            logger.error(f"서비스 초기화 중 오류: {e}")
-            logger.error(traceback.format_exc())
-        
-        return initialization_results
+            logger.error(f"서비스 초기화 실패: {e}")
+            raise
     
     async def start_scanning(self, tickers: List[str]) -> bool:
         """실시간 스캐닝 시작"""

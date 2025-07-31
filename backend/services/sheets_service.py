@@ -126,7 +126,7 @@ class SheetsService:
         try:
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
-                range=f"{self.ATOM_DB}!A:G"  # A~G 컬럼 (Timeframe 포함)
+                range=f"{self.ATOM_DB}!A:Q"  # A~Q 컬럼 (Timeframe 포함)
             ).execute()
             
             values = result.get('values', [])
@@ -193,7 +193,7 @@ class SheetsService:
         try:
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
-                range=f"{self.MOLECULE_DB}!A:G"  # A~G 컬럼
+                range=f"{self.MOLECULE_DB}!A:Q"  # A~Q 컬럼
             ).execute()
             
             values = result.get('values', [])

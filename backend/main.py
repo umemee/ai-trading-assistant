@@ -394,7 +394,7 @@ trading_system = TradingSystemCore()
 async def lifespan(app: FastAPI):
     """앱 시작/종료 시 실행되는 로직"""
     # 시작
-    logger.info("🚀 AI Trading Assistant V5.1 Backend Starting...")
+    logger.info("🚀 AI Trading Assistant V5.5 Backend Starting...")
     
     # 환경 변수에서 기본 설정 로드
     default_settings = {
@@ -413,14 +413,14 @@ async def lifespan(app: FastAPI):
     yield
     
     # 종료
-    logger.info("🛑 AI Trading Assistant V5.1 Backend Shutting down...")
+    logger.info("🛑 AI Trading Assistant V5.5 Backend Shutting down...")
     await trading_system.stop_scanning()
 
 # FastAPI 앱 생성
 app = FastAPI(
-    title="AI Trading Assistant V5.1",
+    title="AI Trading Assistant V5.5",
     description="Complete AI Trading System with Full Integration",
-    version="5.1.0",
+    version="5.5.0",
     lifespan=lifespan
 )
 
@@ -449,7 +449,7 @@ async def root():
         <!DOCTYPE html>
         <html>
         <head>
-            <title>AI Trading Assistant V5.1</title>
+            <title>AI Trading Assistant V5.5</title>
             <style>
                 body { font-family: Arial, sans-serif; margin: 40px; background: #f0f0f0; }
                 .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
@@ -461,7 +461,7 @@ async def root():
         </head>
         <body>
             <div class="container">
-                <h1>🚀 AI Trading Assistant V5.1 Backend</h1>
+                <h1>🚀 AI Trading Assistant V5.5 Backend</h1>
                 <p><strong>상태:</strong> 정상 실행 중</p>
                 <p><strong>시작 시간:</strong> {start_time}</p>
                 
@@ -504,7 +504,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "system": trading_system.get_system_status(),
-        "message": "AI Trading Assistant V5.1 Backend is running!"
+        "message": "AI Trading Assistant V5.5 Backend is running!"
     }
 
 @app.get("/api/status")
@@ -521,7 +521,7 @@ async def websocket_endpoint(websocket: WebSocket):
         # 환영 메시지
         await manager.send_personal_message({
             "type": "system_status",
-            "message": "AI Trading Assistant V5.1 백엔드와 연결되었습니다",
+            "message": "AI Trading Assistant V5.5 백엔드와 연결되었습니다",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "system_info": trading_system.get_system_status()
         }, websocket)
@@ -701,7 +701,7 @@ async def global_exception_handler(request, exc):
 
 if __name__ == "__main__":
     # 개발 서버 실행
-    logger.info("🚀 AI Trading Assistant V5.1 Backend 시작")
+    logger.info("🚀 AI Trading Assistant V5.5 Backend 시작")
     
     uvicorn.run(
         "main:app",

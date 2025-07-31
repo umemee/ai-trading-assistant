@@ -163,7 +163,7 @@ class TradingAssistant {
             const password = pwInput ? pwInput.value : '';
             
             // 간단한 패스워드 체크 (실제 운영에서는 더 강화된 인증 필요)
-            if (password === 'admin123' || password === 'trading2025') {
+            if (password === 'admin123' || password === '2025') {
                 this.showSection('main');
                 this.addLog('로그인 성공', 'success');
                 

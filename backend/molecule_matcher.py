@@ -72,28 +72,39 @@ class MoleculeMatcher:
             self.load_demo_molecules()
         logger.info(f"분자 정의 {len(self.molecules_cache)}개 로드 완료")
 
-    async def load_molecules_from_sheets(self):
-        try:
-            molecule_data = await self.sheets_service.get_molecules()
-            self.molecules_cache = {}
-            for molecule in molecule_data:
-                molecule_id = molecule.get('Molecule_ID')
-                if molecule_id:
-                    required_atoms = molecule.get('Required_Atom_IDs', [])
-                    if isinstance(required_atoms, str):
-                        required_atoms = [aid.strip() for aid in required_atoms.split(',') if aid.strip()]
-                    self.molecules_cache[molecule_id] = {
-                        'id': molecule_id,
-                        'name': molecule.get('Molecule_Name', ''),
-                        'category': molecule.get('Category', ''),
-                        'required_atoms': required_atoms,
-                        'match_threshold': float(molecule.get('Match_Threshold_%', 100)),
-                        'translation_notes': molecule.get('Translation_Notes', ''),
-                        'entry_sl_tp': molecule.get('Entry_SL_TP', '')
-                    }
-        except Exception as e:
-            logger.error(f"Google Sheets 분자 로드 실패: {e}")
-            raise
+    # molecule_matcher.py의 load_molecules_from_sheets 메서드 수정
+async def load_molecules_from_sheets(self):
+    """Google Sheets에서 분자 정의 로드 - active 상태만 로드"""
+    try:
+        molecule_data = await self.sheets_service.get_molecules()
+        self.molecules_cache = {}
+        
+        for molecule in molecule_data:
+            molecule_id = molecule.get('Molecule_ID')
+            molecule_status = molecule.get('Status', '').lower()
+            
+            # ⭐ 승인 로직: active 상태인 분자만 로드
+            if molecule_id and molecule_status == 'active':
+                required_atoms = molecule.get('Required_Atom_IDs', [])
+                if isinstance(required_atoms, str):
+                    required_atoms = [aid.strip() for aid in required_atoms.split(',') if aid.strip()]
+
+                self.molecules_cache[molecule_id] = {
+                    'id': molecule_id,
+                    'name': molecule.get('Molecule_Name', ''),
+                    'category': molecule.get('Category', ''),
+                    'required_atoms': required_atoms,
+                    'match_threshold': float(molecule.get('Match_Threshold_%', 100)),
+                    'translation_notes': molecule.get('Translation_Notes', ''),
+                    'entry_sl_tp': molecule.get('Entry_SL_TP', ''),
+                    'status': molecule_status
+                }
+
+        logger.info(f"활성 분자 {len(self.molecules_cache)}개 로드 완료")
+
+    except Exception as e:
+        logger.error(f"Google Sheets 분자 로드 실패: {e}")
+        raise
 
     def load_demo_molecules(self):
         self.molecules_cache = {

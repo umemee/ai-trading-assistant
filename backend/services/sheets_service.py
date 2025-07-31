@@ -1,13 +1,10 @@
 """
 sheets_service.py - Google Sheets API 연동 서비스
-AI 트레이딩 어시스턴트 V5.1의 핵심 데이터베이스 인터페이스
+AI 트레이딩 어시스턴트 V5.5의 핵심 데이터베이스 인터페이스
 
-5개 핵심 시트와의 완전한 CRUD 작업 지원:
-- Atom_DB: 아톰 정의 관리
-- Molecule_DB: 분자 전략 관리  
-- SIDB: 실시간 신호 기록
-- Performance_Dashboard: 성과 대시보드
-- Prediction_Notes: 예측/오답노트
+- 10개 핵심 시트와의 완전한 CRUD 작업 지원
+- 환경별 시트 ID 자동 적용
+- 데이터 무결성을 위한 행 단위 업데이트
 """
 
 import asyncio
@@ -28,658 +25,230 @@ logger = logging.getLogger(__name__)
 
 class SheetsService:
     """Google Sheets API 서비스 클래스"""
-    
-    def __init__(self, spreadsheet_id: str, service_account_json: Union[str, Dict] = None):
+
+    def __init__(self, spreadsheet_id: str, credentials_path: str = "credentials.json"):
         """
         Google Sheets API 서비스 초기화
-        
-        Args:
-            spreadsheet_id: Google Sheets 스프레드시트 ID
-            service_account_json: 서비스 계정 JSON (문자열 또는 딕셔너리)
         """
         self.spreadsheet_id = spreadsheet_id
-        self.service = None
-        self._credentials = None
-        
-        # 스코프 정의
-        self.scopes = [
-            'https://www.googleapis.com/auth/spreadsheets',
-            'https://www.googleapis.com/auth/drive.readonly'
-        ]
-        
-        # 시트 이름 상수
+        self._credentials = self._load_credentials(credentials_path)
+        self.service = build('sheets', 'v4', credentials=self._credentials)
+
+        # 시트 이름 상수 정의 (기획서 기준)
         self.ATOM_DB = "Atom_DB"
         self.MOLECULE_DB = "Molecule_DB"
         self.SIDB = "SIDB"
         self.PERFORMANCE_DASHBOARD = "Performance_Dashboard"
         self.PREDICTION_NOTES = "Prediction_Notes"
+        # 신규 시트
+        self.QUARANTINE_QUEUE = "Quarantine_Queue"
+        self.APPROVAL_LOG = "Approval_Log"
+        self.VERSION_HISTORY = "Version_History"
+        self.RISK_ALERTS = "Risk_Alerts"
+        self.WFO_RESULTS = "WFO_Results"
+
+        logger.info("Google Sheets API 서비스 초기화 완료")
+
+    def _load_credentials(self, credentials_path: str) -> Credentials:
+        """서비스 계정 인증 정보 로드"""
+        scopes = ['https://www.googleapis.com/auth/spreadsheets']
+        # 환경 변수에서 인증 정보 로드 시도
+        creds_json_str = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+        if creds_json_str:
+            try:
+                creds_info = json.loads(creds_json_str)
+                return Credentials.from_service_account_info(creds_info, scopes=scopes)
+            except json.JSONDecodeError:
+                logger.error("환경 변수의 GOOGLE_SERVICE_ACCOUNT_JSON이 올바른 JSON 형식이 아닙니다.")
         
-        # 인증 및 서비스 초기화
-        self._initialize_service(service_account_json)
-    
-    def _initialize_service(self, service_account_json: Union[str, Dict] = None):
-        """Google Sheets API 서비스 초기화"""
-        try:
-            # 서비스 계정 인증 정보 로드
-            if service_account_json:
-                if isinstance(service_account_json, str):
-                    # JSON 문자열인 경우
-                    if service_account_json.startswith('{'):
-                        credentials_info = json.loads(service_account_json)
-                    else:
-                        # 파일 경로인 경우
-                        with open(service_account_json, 'r') as f:
-                            credentials_info = json.load(f)
-                else:
-                    # 딕셔너리인 경우
-                    credentials_info = service_account_json
-                    
-                self._credentials = Credentials.from_service_account_info(
-                    credentials_info, scopes=self.scopes
-                )
-            else:
-                # 환경 변수에서 로드
-                credentials_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
-                if credentials_json:
-                    credentials_info = json.loads(credentials_json)
-                    self._credentials = Credentials.from_service_account_info(
-                        credentials_info, scopes=self.scopes
-                    )
-                else:
-                    # 기본 인증 파일 사용
-                    default_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-                    if default_path and os.path.exists(default_path):
-                        self._credentials = Credentials.from_service_account_file(
-                            default_path, scopes=self.scopes
-                        )
-                    else:
-                        raise ValueError("Google 서비스 계정 인증 정보를 찾을 수 없습니다.")
-            
-            # Google Sheets API 서비스 빌드
-            self.service = build('sheets', 'v4', credentials=self._credentials)
-            logger.info("Google Sheets API 서비스 초기화 완료")
-            
-        except Exception as e:
-            logger.error(f"Google Sheets API 초기화 실패: {e}")
-            raise
-    
-    async def test_connection(self) -> bool:
-        """연결 테스트"""
-        try:
-            # 스프레드시트 메타데이터 조회로 연결 테스트
-            result = self.service.spreadsheets().get(
-                spreadsheetId=self.spreadsheet_id
-            ).execute()
-            
-            title = result.get('properties', {}).get('title', 'Unknown')
-            logger.info(f"Google Sheets 연결 성공: {title}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Google Sheets 연결 테스트 실패: {e}")
-            return False
-    
-    # ================== 아톰 DB 관리 ==================
-    
-    async def get_atoms(self) -> List[Dict]:
-        """아톰 DB에서 모든 아톰 데이터 조회"""
+        # 파일에서 로드
+        if os.path.exists(credentials_path):
+            return Credentials.from_service_account_file(credentials_path, scopes=scopes)
+        
+        raise FileNotFoundError(
+            f"인증 파일을 찾을 수 없습니다. "
+            f"GOOGLE_SERVICE_ACCOUNT_JSON 환경 변수를 설정하거나 "
+            f"'{credentials_path}' 파일을 프로젝트 루트에 위치시켜 주세요."
+        )
+
+    async def _get_sheet_values(self, range_name: str) -> List[List[Any]]:
+        """시트의 모든 값을 가져오는 유틸리티 함수"""
         try:
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
-                range=f"{self.ATOM_DB}!A:Q"  # A~Q 컬럼 (Timeframe 포함)
+                range=range_name
             ).execute()
-            
-            values = result.get('values', [])
-            if not values:
-                logger.warning("아톰 DB가 비어있습니다")
-                return []
-            
-            # 헤더 행과 데이터 분리
-            headers = values[0]
-            atoms = []
-            
-            for row in values[1:]:
-                # 행이 헤더보다 짧을 경우 빈 문자열로 채움
-                while len(row) < len(headers):
-                    row.append('')
-                
-                atom = dict(zip(headers, row))
-                atoms.append(atom)
-            
-            logger.info(f"{len(atoms)}개 아톰 로드 완료")
-            return atoms
-            
-        except Exception as e:
-            logger.error(f"아톰 조회 실패: {e}")
+            return result.get('values', [])
+        except HttpError as e:
+            logger.error(f"시트 값 조회 실패 ({range_name}): {e}")
+            if e.resp.status == 404:
+                logger.error(f"시트 또는 범위를 찾을 수 없습니다. 시트 이름이 '{range_name}'이 맞는지 확인하세요.")
             return []
-    
-    async def add_atom(self, atom_data: Dict) -> bool:
-        """새 아톰을 아톰 DB에 추가"""
+
+    async def _append_row(self, sheet_name: str, values: List[Any]) -> bool:
+        """시트에 한 행을 추가하는 유틸리티 함수"""
         try:
-            # 현재 데이터 확인하여 다음 행 결정
-            current_atoms = await self.get_atoms()
-            next_row = len(current_atoms) + 2  # 헤더 행 + 1
-            
-            # 아톰 데이터를 리스트로 변환
-            values = [
-                atom_data.get('Atom_ID', ''),
-                atom_data.get('Atom_Name', ''),
-                atom_data.get('Description', ''),
-                atom_data.get('Output_Column_Name', ''),
-                atom_data.get('Category', ''),
-                atom_data.get('Source_Reference', ''),
-                atom_data.get('Timeframe', '')
-            ]
-            
-            # 시트에 추가
-            result = self.service.spreadsheets().values().append(
+            body = {'values': [values]}
+            self.service.spreadsheets().values().append(
                 spreadsheetId=self.spreadsheet_id,
-                range=f"{self.ATOM_DB}!A{next_row}",
-                valueInputOption='RAW',
-                body={'values': [values]}
-            ).execute()
-            
-            logger.info(f"새 아톰 추가: {atom_data.get('Atom_ID')}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"아톰 추가 실패: {e}")
-            return False
-    
-    # ================== 분자 DB 관리 ==================
-    
-    async def get_molecules(self) -> List[Dict]:
-        """분자 DB에서 모든 분자 데이터 조회"""
-        try:
-            result = self.service.spreadsheets().values().get(
-                spreadsheetId=self.spreadsheet_id,
-                range=f"{self.MOLECULE_DB}!A:Q"  # A~Q 컬럼
-            ).execute()
-            
-            values = result.get('values', [])
-            if not values:
-                logger.warning("분자 DB가 비어있습니다")
-                return []
-            
-            headers = values[0]
-            molecules = []
-            
-            for row in values[1:]:
-                while len(row) < len(headers):
-                    row.append('')
-                
-                molecule = dict(zip(headers, row))
-                
-                # Required_Atom_IDs를 리스트로 변환
-                if molecule.get('Required_Atom_IDs'):
-                    molecule['Required_Atom_IDs'] = [
-                        atom_id.strip() 
-                        for atom_id in molecule['Required_Atom_IDs'].split(',')
-                        if atom_id.strip()
-                    ]
-                else:
-                    molecule['Required_Atom_IDs'] = []
-                
-                # Match_Threshold_%를 숫자로 변환
-                try:
-                    molecule['Match_Threshold_%'] = float(molecule.get('Match_Threshold_%', 0))
-                except ValueError:
-                    molecule['Match_Threshold_%'] = 0.0
-                
-                molecules.append(molecule)
-            
-            logger.info(f"{len(molecules)}개 분자 로드 완료")
-            return molecules
-            
-        except Exception as e:
-            logger.error(f"분자 조회 실패: {e}")
-            return []
-    
-    async def add_molecule(self, molecule_data: Dict) -> bool:
-        """새 분자를 분자 DB에 추가"""
-        try:
-            current_molecules = await self.get_molecules()
-            next_row = len(current_molecules) + 2
-            
-            # Required_Atom_IDs를 문자열로 변환
-            required_atoms = molecule_data.get('Required_Atom_IDs', [])
-            if isinstance(required_atoms, list):
-                required_atoms_str = ', '.join(required_atoms)
-            else:
-                required_atoms_str = str(required_atoms)
-            
-            values = [
-                molecule_data.get('Molecule_ID', ''),
-                molecule_data.get('Molecule_Name', ''),
-                molecule_data.get('Category', ''),
-                required_atoms_str,
-                molecule_data.get('Match_Threshold_%', 100),
-                molecule_data.get('Translation_Notes', ''),
-                molecule_data.get('Entry_SL_TP', '')
-            ]
-            
-            result = self.service.spreadsheets().values().append(
-                spreadsheetId=self.spreadsheet_id,
-                range=f"{self.MOLECULE_DB}!A{next_row}",
-                valueInputOption='RAW',
-                body={'values': [values]}
-            ).execute()
-            
-            logger.info(f"새 분자 추가: {molecule_data.get('Molecule_ID')}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"분자 추가 실패: {e}")
-            return False
-    
-    # ================== SIDB 관리 ==================
-    
-    async def append_sidb_record(self, signal_data: Dict) -> bool:
-        """SIDB에 새 신호 기록 추가"""
-        try:
-            # Instance_ID 생성 (없는 경우)
-            if 'Instance_ID' not in signal_data:
-                signal_data['Instance_ID'] = str(uuid.uuid4())
-            
-            # UTC 타임스탬프 생성 (없는 경우)
-            if 'Timestamp_UTC' not in signal_data:
-                signal_data['Timestamp_UTC'] = datetime.now(timezone.utc).isoformat()
-            
-            values = [
-                signal_data.get('Instance_ID'),
-                signal_data.get('Timestamp_UTC'),
-                signal_data.get('Ticker', ''),
-                signal_data.get('Atom_ID', ''),
-                signal_data.get('Timeframe', '1m'),
-                signal_data.get('Price_At_Signal', 0),
-                signal_data.get('Volume_At_Signal', 0),
-                signal_data.get('Context_Atoms_Active', ''),
-                signal_data.get('Is_Duplicate', False)
-            ]
-            
-            result = self.service.spreadsheets().values().append(
-                spreadsheetId=self.spreadsheet_id,
-                range=f"{self.SIDB}!A:I",
-                valueInputOption='RAW',
-                body={'values': [values]}
-            ).execute()
-            
-            logger.info(f"SIDB 기록 추가: {signal_data.get('Ticker')} - {signal_data.get('Atom_ID')}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"SIDB 기록 추가 실패: {e}")
-            return False
-    
-    async def get_recent_sidb_records(self, hours: int = 24, ticker: str = None) -> List[Dict]:
-        """최근 N시간 내 SIDB 기록 조회"""
-        try:
-            result = self.service.spreadsheets().values().get(
-                spreadsheetId=self.spreadsheet_id,
-                range=f"{self.SIDB}!A:I"
-            ).execute()
-            
-            values = result.get('values', [])
-            if len(values) < 2:
-                return []
-            
-            headers = values[0]
-            records = []
-            cutoff_time = datetime.now(timezone.utc).timestamp() - (hours * 3600)
-            
-            for row in values[1:]:
-                while len(row) < len(headers):
-                    row.append('')
-                
-                record = dict(zip(headers, row))
-                
-                # 시간 필터링
-                try:
-                    record_time = datetime.fromisoformat(
-                        record.get('Timestamp_UTC', '').replace('Z', '+00:00')
-                    ).timestamp()
-                    if record_time < cutoff_time:
-                        continue
-                except:
-                    continue
-                
-                # 티커 필터링
-                if ticker and record.get('Ticker') != ticker:
-                    continue
-                
-                records.append(record)
-            
-            logger.info(f"최근 {hours}시간 SIDB 기록 {len(records)}개 조회")
-            return records
-            
-        except Exception as e:
-            logger.error(f"SIDB 기록 조회 실패: {e}")
-            return []
-    
-    # ================== 성과 대시보드 관리 ==================
-    
-    async def get_performance_data(self) -> List[Dict]:
-        """성과 대시보드 데이터 조회"""
-        try:
-            result = self.service.spreadsheets().values().get(
-                spreadsheetId=self.spreadsheet_id,
-                range=f"{self.PERFORMANCE_DASHBOARD}!A:H"
-            ).execute()
-            
-            values = result.get('values', [])
-            if len(values) < 2:
-                return []
-            
-            headers = values[0]
-            performance_data = []
-            
-            for row in values[1:]:
-                while len(row) < len(headers):
-                    row.append('')
-                
-                record = dict(zip(headers, row))
-                
-                # 숫자 필드 변환
-                numeric_fields = ['Total_Trades', 'Win_Rate_%', 'Avg_RRR', 
-                                'Avg_Hold_Time_Mins', 'Profit_Factor', 'Confidence_Score']
-                
-                for field in numeric_fields:
-                    try:
-                        record[field] = float(record.get(field, 0))
-                    except ValueError:
-                        record[field] = 0.0
-                
-                performance_data.append(record)
-            
-            logger.info(f"성과 데이터 {len(performance_data)}개 조회")
-            return performance_data
-            
-        except Exception as e:
-            logger.error(f"성과 데이터 조회 실패: {e}")
-            return []
-    
-    async def update_performance_record(self, molecule_id: str, performance_data: Dict) -> bool:
-        """특정 분자의 성과 기록 업데이트"""
-        try:
-            # 현재 성과 데이터 조회
-            current_data = await self.get_performance_data()
-            
-            # 해당 분자 ID 찾기
-            target_row = None
-            for i, record in enumerate(current_data):
-                if record.get('Molecule_ID') == molecule_id:
-                    target_row = i + 2  # 헤더 행 고려
-                    break
-            
-            # 새 레코드인 경우 추가
-            if target_row is None:
-                values = [
-                    molecule_id,
-                    performance_data.get('Total_Trades', 0),
-                    performance_data.get('Win_Rate_%', 0),
-                    performance_data.get('Avg_RRR', 0),
-                    performance_data.get('Avg_Hold_Time_Mins', 0),
-                    performance_data.get('Profit_Factor', 0),
-                    performance_data.get('Confidence_Score', 0),
-                    datetime.now(timezone.utc).isoformat()
-                ]
-                
-                result = self.service.spreadsheets().values().append(
-                    spreadsheetId=self.spreadsheet_id,
-                    range=f"{self.PERFORMANCE_DASHBOARD}!A:H",
-                    valueInputOption='RAW',
-                    body={'values': [values]}
-                ).execute()
-            else:
-                # 기존 레코드 업데이트
-                values = [
-                    molecule_id,
-                    performance_data.get('Total_Trades', 0),
-                    performance_data.get('Win_Rate_%', 0),
-                    performance_data.get('Avg_RRR', 0),
-                    performance_data.get('Avg_Hold_Time_Mins', 0),
-                    performance_data.get('Profit_Factor', 0),
-                    performance_data.get('Confidence_Score', 0),
-                    datetime.now(timezone.utc).isoformat()
-                ]
-                
-                result = self.service.spreadsheets().values().update(
-                    spreadsheetId=self.spreadsheet_id,
-                    range=f"{self.PERFORMANCE_DASHBOARD}!A{target_row}:H{target_row}",
-                    valueInputOption='RAW',
-                    body={'values': [values]}
-                ).execute()
-            
-            logger.info(f"성과 기록 업데이트: {molecule_id}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"성과 기록 업데이트 실패: {e}")
-            return False
-    
-    # ================== 예측/오답노트 관리 ==================
-    
-    async def add_prediction_record(self, prediction_data: Dict) -> bool:
-        """예측/오답노트에 새 예측 기록 추가"""
-        try:
-            # Prediction_ID 생성 (없는 경우)
-            if 'Prediction_ID' not in prediction_data:
-                prediction_data['Prediction_ID'] = str(uuid.uuid4())
-            
-            # UTC 타임스탬프 생성 (없는 경우)
-            if 'Timestamp_UTC' not in prediction_data:
-                prediction_data['Timestamp_UTC'] = datetime.now(timezone.utc).isoformat()
-            
-            # Key_Atoms_Found 리스트를 문자열로 변환
-            key_atoms = prediction_data.get('Key_Atoms_Found', [])
-            if isinstance(key_atoms, list):
-                key_atoms_str = ', '.join(key_atoms)
-            else:
-                key_atoms_str = str(key_atoms)
-            
-            values = [
-                prediction_data.get('Prediction_ID'),
-                prediction_data.get('Timestamp_UTC'),
-                prediction_data.get('Ticker', ''),
-                prediction_data.get('Triggered_Molecule_ID', ''),
-                prediction_data.get('Prediction_Summary', ''),
-                key_atoms_str,
-                prediction_data.get('Actual_Outcome', ''),
-                prediction_data.get('Human_Feedback', ''),
-                prediction_data.get('AI_Review_Summary', ''),
-                prediction_data.get('Position_Size', ''),
-                prediction_data.get('Overnight_Permission', '')
-            ]
-            
-            result = self.service.spreadsheets().values().append(
-                spreadsheetId=self.spreadsheet_id,
-                range=f"{self.PREDICTION_NOTES}!A:K",
-                valueInputOption='RAW',
-                body={'values': [values]}
-            ).execute()
-            
-            logger.info(f"예측 기록 추가: {prediction_data.get('Ticker')} - {prediction_data.get('Triggered_Molecule_ID')}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"예측 기록 추가 실패: {e}")
-            return False
-    
-    async def get_pending_predictions(self) -> List[Dict]:
-        """아직 결과가 입력되지 않은 예측들 조회"""
-        try:
-            result = self.service.spreadsheets().values().get(
-                spreadsheetId=self.spreadsheet_id,
-                range=f"{self.PREDICTION_NOTES}!A:K"
-            ).execute()
-            
-            values = result.get('values', [])
-            if len(values) < 2:
-                return []
-            
-            headers = values[0]
-            pending_predictions = []
-            
-            for row in values[1:]:
-                while len(row) < len(headers):
-                    row.append('')
-                
-                record = dict(zip(headers, row))
-                
-                # Actual_Outcome이 비어있는 경우만 반환
-                if not record.get('Actual_Outcome', '').strip():
-                    pending_predictions.append(record)
-            
-            logger.info(f"미완료 예측 {len(pending_predictions)}개 조회")
-            return pending_predictions
-            
-        except Exception as e:
-            logger.error(f"미완료 예측 조회 실패: {e}")
-            return []
-    
-    async def update_prediction_outcome(self, prediction_id: str, 
-                                      actual_outcome: str, 
-                                      human_feedback: str = '',
-                                      ai_review_summary: str = '') -> bool:
-        """예측 결과 업데이트"""
-        try:
-            # 현재 예측 노트 데이터 조회
-            result = self.service.spreadsheets().values().get(
-                spreadsheetId=self.spreadsheet_id,
-                range=f"{self.PREDICTION_NOTES}!A:K"
-            ).execute()
-            
-            values = result.get('values', [])
-            if len(values) < 2:
-                return False
-            
-            headers = values[0]
-            
-            # 해당 예측 ID 찾기
-            target_row = None
-            for i, row in enumerate(values[1:]):
-                while len(row) < len(headers):
-                    row.append('')
-                
-                if row[0] == prediction_id:  # Prediction_ID는 첫 번째 컬럼
-                    target_row = i + 2  # 헤더 행 고려
-                    break
-            
-            if target_row is None:
-                logger.error(f"예측 ID {prediction_id}를 찾을 수 없습니다")
-                return False
-            
-            # 특정 컬럼만 업데이트
-            updates = [
-                {
-                    'range': f"{self.PREDICTION_NOTES}!G{target_row}",  # Actual_Outcome
-                    'values': [[actual_outcome]]
-                },
-                {
-                    'range': f"{self.PREDICTION_NOTES}!H{target_row}",  # Human_Feedback
-                    'values': [[human_feedback]]
-                },
-                {
-                    'range': f"{self.PREDICTION_NOTES}!I{target_row}",  # AI_Review_Summary
-                    'values': [[ai_review_summary]]
-                }
-            ]
-            
-            # 배치 업데이트 실행
-            body = {
-                'valueInputOption': 'RAW',
-                'data': updates
-            }
-            
-            result = self.service.spreadsheets().values().batchUpdate(
-                spreadsheetId=self.spreadsheet_id,
+                range=f"{sheet_name}!A1",
+                valueInputOption='USER_ENTERED',
+                insertDataOption='INSERT_ROWS',
                 body=body
             ).execute()
-            
-            logger.info(f"예측 결과 업데이트: {prediction_id}")
             return True
-            
         except Exception as e:
-            logger.error(f"예측 결과 업데이트 실패: {e}")
+            logger.error(f"시트 행 추가 실패 ({sheet_name}): {e}")
             return False
-    
-    # ================== 유틸리티 메서드 ==================
-    
-    async def get_sheet_info(self) -> Dict:
-        """스프레드시트 정보 조회"""
-        try:
-            result = self.service.spreadsheets().get(
-                spreadsheetId=self.spreadsheet_id
-            ).execute()
-            
-            sheets_info = []
-            for sheet in result.get('sheets', []):
-                props = sheet.get('properties', {})
-                sheets_info.append({
-                    'title': props.get('title'),
-                    'sheetId': props.get('sheetId'),
-                    'gridProperties': props.get('gridProperties', {})
-                })
-            
-            return {
-                'title': result.get('properties', {}).get('title'),
-                'sheets': sheets_info
-            }
-            
-        except Exception as e:
-            logger.error(f"시트 정보 조회 실패: {e}")
-            return {}
-    
-    async def backup_data(self) -> Dict:
-        """모든 데이터 백업"""
-        try:
-            backup_data = {
-                'timestamp': datetime.now(timezone.utc).isoformat(),
-                'atoms': await self.get_atoms(),
-                'molecules': await self.get_molecules(),
-                'sidb_recent': await self.get_recent_sidb_records(hours=168),  # 7일
-                'performance': await self.get_performance_data(),
-                'pending_predictions': await self.get_pending_predictions()
-            }
-            
-            logger.info("데이터 백업 완료")
-            return backup_data
-            
-        except Exception as e:
-            logger.error(f"데이터 백업 실패: {e}")
-            return {}
 
-# 사용 예시
-if __name__ == "__main__":
-    async def test_sheets_service():
-        # 환경 변수에서 설정 로드
-        spreadsheet_id = os.getenv('GOOGLE_SPREADSHEET_ID')
-        service_account_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+    async def get_molecules(self) -> List[Dict]:
+        """분자 DB에서 모든 분자 데이터 조회"""
+        values = await self._get_sheet_values(self.MOLECULE_DB)
+        if not values or len(values) < 2:
+            return []
         
-        if not spreadsheet_id:
-            print("GOOGLE_SPREADSHEET_ID 환경 변수가 설정되지 않았습니다.")
-            return
+        headers = values[0]
+        molecules = [dict(zip(headers, row)) for row in values[1:]]
+        return molecules
         
-        # 서비스 초기화
-        sheets_service = SheetsService(
-            spreadsheet_id=spreadsheet_id,
-            service_account_json=service_account_json
-        )
+    async def get_atoms(self) -> List[Dict]:
+        """아톰 DB에서 모든 아톰 데이터 조회"""
+        values = await self._get_sheet_values(self.ATOM_DB)
+        if not values or len(values) < 2:
+            return []
         
-        # 연결 테스트
-        if await sheets_service.test_connection():
-            print("✅ Google Sheets 연결 성공")
-            
-            # 아톰 데이터 조회
-            atoms = await sheets_service.get_atoms()
-            print(f"📊 아톰 {len(atoms)}개 로드")
-            
-            # 분자 데이터 조회
-            molecules = await sheets_service.get_molecules()
-            print(f"🧬 분자 {len(molecules)}개 로드")
-            
-        else:
-            print("❌ Google Sheets 연결 실패")
+        headers = values[0]
+        atoms = [dict(zip(headers, row)) for row in values[1:]]
+        return atoms
     
-    # 테스트 실행
-    asyncio.run(test_sheets_service())
+    # === 1단계 목표: 신규 DB 시트 연동 함수 구현 ===
+
+    async def save_wfo_result(self, result_data: Dict) -> bool:
+        """WFO_Results 시트에 WFO 검증 결과 기록"""
+        logger.info(f"WFO 결과 저장 요청: {result_data.get('Molecule_ID')}")
+        values = [
+            result_data.get('Result_ID', str(uuid.uuid4())),
+            result_data.get('Molecule_ID'),
+            result_data.get('Test_Date', datetime.now(timezone.utc).isoformat()),
+            result_data.get('Walk_Forward_Periods'),
+            result_data.get('Simple_Return'),
+            result_data.get('WFO_Return'),
+            result_data.get('WFO_Efficiency'),
+            result_data.get('Max_Drawdown'),
+            result_data.get('Sharpe_Ratio'),
+            result_data.get('Parameter_Stability_Score'),
+            result_data.get('Validation_Status')
+        ]
+        return await self._append_row(self.WFO_RESULTS, values)
+
+    async def save_risk_alert(self, alert_data: Dict) -> bool:
+        """Risk_Alerts 시트에 위험 알림 기록"""
+        logger.info(f"위험 알림 저장 요청: {alert_data.get('Molecule_ID')}")
+        values = [
+            alert_data.get('Alert_ID', str(uuid.uuid4())),
+            alert_data.get('Molecule_ID'),
+            alert_data.get('Alert_Type'),
+            alert_data.get('Alert_Level'),
+            alert_data.get('Triggered_Date', datetime.now(timezone.utc).isoformat()),
+            alert_data.get('Auto_Action'),
+            alert_data.get('Current_Drawdown'),
+            alert_data.get('Alert_Details')
+        ]
+        return await self._append_row(self.RISK_ALERTS, values)
+
+    async def save_version_record(self, version_data: Dict) -> bool:
+        """Version_History 시트에 버전 변경 이력 기록"""
+        logger.info(f"버전 기록 저장 요청: {version_data.get('Object_ID')}")
+        values = [
+            version_data.get('History_ID', str(uuid.uuid4())),
+            version_data.get('Molecule_ID'),
+            version_data.get('Version'),
+            json.dumps(version_data.get('Changed_Fields', {})),
+            json.dumps(version_data.get('Old_Values', {})),
+            json.dumps(version_data.get('New_Values', {})),
+            version_data.get('Changed_By'),
+            version_data.get('Changed_Date', datetime.now(timezone.utc).isoformat()),
+            version_data.get('Change_Reason')
+        ]
+        return await self._append_row(self.VERSION_HISTORY, values)
+
+    async def log_approval_action(self, log_data: Dict) -> bool:
+        """Approval_Log 시트에 승인/거부 활동 기록"""
+        logger.info(f"승인 활동 기록 요청: {log_data.get('Molecule_ID')}")
+        values = [
+            log_data.get('Log_ID', str(uuid.uuid4())),
+            log_data.get('Molecule_ID'),
+            log_data.get('Action'), # 'approved' or 'rejected'
+            log_data.get('Reviewer'),
+            log_data.get('Review_Date', datetime.now(timezone.utc).isoformat()),
+            log_data.get('Review_Notes'),
+            log_data.get('Previous_Status'),
+            log_data.get('New_Status')
+        ]
+        return await self._append_row(self.APPROVAL_LOG, values)
+
+    async def update_molecule_info(self, molecule_id: str, updates: Dict[str, Any]) -> bool:
+        """Molecule_DB의 특정 분자 정보 업데이트"""
+        logger.info(f"분자 정보 업데이트 요청: {molecule_id}, 업데이트 항목: {list(updates.keys())}")
+        try:
+            values = await self._get_sheet_values(self.MOLECULE_DB)
+            if not values or len(values) < 2:
+                logger.error("분자 DB가 비어있거나 헤더가 없습니다.")
+                return False
+
+            headers = values[0]
+            
+            # 업데이트할 컬럼 인덱스 찾기
+            update_indices = {}
+            for key in updates.keys():
+                if key not in headers:
+                    logger.warning(f"'{key}' 컬럼이 분자 DB에 없어 업데이트를 건너뜁니다.")
+                    continue
+                update_indices[key] = headers.index(key)
+
+            if not update_indices:
+                logger.warning("업데이트할 유효한 컬럼이 없습니다.")
+                return False
+
+            # 해당 분자 ID를 찾아 행 업데이트
+            mol_id_col_index = headers.index("Molecule_ID")
+            target_row_index = -1
+            for i, row in enumerate(values[1:]):
+                if row[mol_id_col_index] == molecule_id:
+                    target_row_index = i + 2  # 시트 인덱스는 1부터 시작, 헤더 제외
+                    break
+            
+            if target_row_index == -1:
+                logger.error(f"업데이트할 분자를 찾지 못했습니다: {molecule_id}")
+                return False
+
+            # Google Sheets API의 batchUpdate를 사용하여 특정 셀들만 업데이트
+            data = []
+            for key, value in updates.items():
+                if key in update_indices:
+                    col_letter = chr(ord('A') + update_indices[key])
+                    data.append({
+                        'range': f"{self.MOLECULE_DB}!{col_letter}{target_row_index}",
+                        'values': [[value]]
+                    })
+
+            body = {
+                'valueInputOption': 'USER_ENTERED',
+                'data': data
+            }
+            self.service.spreadsheets().values().batchUpdate(
+                spreadsheetId=self.spreadsheet_id, body=body
+            ).execute()
+
+            logger.info(f"분자 정보 업데이트 완료: {molecule_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"분자 정보 업데이트 실패 ({molecule_id}): {e}")
+            return False
+
+# 스크립트 실행 예시 (테스트용)
+if __name__ == '__main__':
+    # 이 부분은 직접 실행되지 않으며, 다른 파일에서 import하여 사용합니다.
+    print("SheetsService 모듈이 로드되었습니다.")
+    print("이 모듈은 AI 트레이딩 시스템의 다른 부분에서 사용됩니다.")

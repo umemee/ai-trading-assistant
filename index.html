@@ -1,163 +1,365 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>AI 트레이딩 어시스턴트 V6.0</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- 아이콘 및 폰트 스타일링 -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 트레이딩 어시스턴트 V6.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-gray-900 text-gray-100">
 
-  <!-- 로그인 모달 -->
-  <div id="pw-modal" class="modal-overlay">
-    <div class="modal-box">
-      <h2 class="modal-title">개인 로그인</h2>
-      <input id="pw-input" type="password" class="modal-input" placeholder="비밀번호를 입력하세요" autocomplete="off" />
-      <button id="pw-btn" class="modal-btn">로그인</button>
-      <div id="login-status" class="modal-status"></div>
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen">
+    <!-- 로그인 섹션 -->
+    <div id="login-section" class="flex items-center justify-center min-h-screen">
+        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl border border-slate-700 w-96">
+            <div class="text-center mb-6">
+                <h1 class="text-2xl font-bold text-blue-400 mb-2">개인 로그인</h1>
+                <p class="text-slate-400 text-sm">AI 트레이딩 어시스턴트 V6.0</p>
+            </div>
+            <div class="space-y-4">
+                <input type="password" id="pw-input" placeholder="패스워드 입력" 
+                       class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="pw-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-semibold transition-colors">
+                    로그인
+                </button>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- 상단 네비게이션 -->
-  <nav class="navbar">
-    <div class="navbar-container">
-      <h1 class="navbar-title">AI 트레이딩 어시스턴트 V6.0</h1>
-      <div class="navbar-menu">
-        <button class="nav-item active" data-section="dashboard">
-          <i class="fas fa-chart-pie"></i> 대시보드
-        </button>
-        <button class="nav-item" data-section="scanner">
-          <i class="fas fa-satellite-dish"></i> SignalScanner
-        </button>
-        <button class="nav-item" data-section="approval">
-          <i class="fas fa-check-double"></i> 승인 워크플로우
-        </button>
-        <button class="nav-item" data-section="meta">
-          <i class="fas fa-chart-line"></i> MetaLearner
-        </button>
-        <button class="nav-item" data-section="logic">
-          <i class="fas fa-brain"></i> LogicDiscoverer
-        </button>
-        <button class="nav-item" data-section="settings">
-          <i class="fas fa-cog"></i> 설정
-        </button>
-        <button id="logout-btn" class="nav-item nav-logout" style="display:none;">
-          <i class="fas fa-sign-out-alt"></i> 로그아웃
-        </button>
-      </div>
-      <div id="user-status" class="navbar-status"></div>
+    <!-- 메인 애플리케이션 -->
+    <div id="main-section" class="hidden">
+        <div class="main-layout">
+            <!-- 사이드바 -->
+            <div class="sidebar">
+                <div class="p-6 border-b border-slate-700">
+                    <h1 class="text-xl font-bold text-blue-400">AI 트레이딩 어시스턴트 V6.0</h1>
+                </div>
+                <nav class="p-4">
+                    <ul class="nav-list space-y-2">
+                        <li><button onclick="showSection('dashboard')" class="nav-item active">
+                            <i class="fas fa-tachometer-alt mr-3"></i>대시보드
+                        </button></li>
+                        <li><button onclick="showSection('scanner')" class="nav-item">
+                            <i class="fas fa-radar mr-3"></i>SignalScanner
+                        </button></li>
+                        <li><button onclick="showSection('approval')" class="nav-item">
+                            <i class="fas fa-clipboard-check mr-3"></i>승인 워크플로우
+                        </button></li>
+                        <li><button onclick="showSection('metalearner')" class="nav-item">
+                            <i class="fas fa-brain mr-3"></i>MetaLearner
+                        </button></li>
+                        <li><button onclick="showSection('discovery')" class="nav-item">
+                            <i class="fas fa-dna mr-3"></i>LogicDiscoverer
+                        </button></li>
+                        <li><button onclick="showSection('settings')" class="nav-item">
+                            <i class="fas fa-cog mr-3"></i>설정
+                        </button></li>
+                    </ul>
+                </nav>
+            </div>
+
+            <!-- 콘텐츠 영역 -->
+            <div class="content-area">
+                <!-- 대시보드 섹션 -->
+                <div id="dashboard" class="content-section active">
+                    <h2 class="text-3xl font-bold mb-6">📊 대시보드</h2>
+                    
+                    <!-- 시스템 상태 카드 -->
+                    <div class="kpi-grid mb-8">
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-blue-500">
+                                <i class="fas fa-server"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h3>시스템 상태:</h3>
+                                <div class="value" id="connection-status">연결 중...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-green-500">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h3>초기화:</h3>
+                                <div class="value" id="system-initialized">⏳ 대기중</div>
+                            </div>
+                        </div>
+                        
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-yellow-500">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h3>스캐너:</h3>
+                                <div class="value" id="system-scanning">🔴 비활성</div>
+                            </div>
+                        </div>
+                        
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-purple-500">
+                                <i class="fas fa-eye"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h3>감시 종목:</h3>
+                                <div class="value" id="ticker-count">0</div>
+                            </div>
+                        </div>
+                        
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-red-500">
+                                <i class="fas fa-atom"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h3>아톰 수:</h3>
+                                <div class="value" id="atoms-count">0</div>
+                            </div>
+                        </div>
+                        
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-pink-500">
+                                <i class="fas fa-fire"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h3>분자 수:</h3>
+                                <div class="value" id="molecules-count">0</div>
+                            </div>
+                        </div>
+                        
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-indigo-500">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h3>업타임:</h3>
+                                <div class="value" id="system-uptime">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 서비스 연결상태 -->
+                    <div class="card mb-6">
+                        <h3 class="text-lg font-semibold mb-4">서비스 연결상태</h3>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="flex items-center">
+                                <span class="status-indicator" id="sheets-status"></span>
+                                <span>Sheets:</span>
+                                <span id="sheets-text" class="ml-auto">-</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="status-indicator" id="gemini-status"></span>
+                                <span>Gemini:</span>
+                                <span id="gemini-text" class="ml-auto">-</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="status-indicator" id="alpaca-status"></span>
+                                <span>Alpaca:</span>
+                                <span id="alpaca-text" class="ml-auto">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 최근 신호 -->
+                    <div class="card mb-6">
+                        <h3 class="text-lg font-semibold mb-4">최근 신호</h3>
+                        <div id="recent-signals" class="log-window">
+                            <p class="text-gray-500">신호 대기 중...</p>
+                        </div>
+                    </div>
+
+                    <!-- 시스템 로그 -->
+                    <div class="card">
+                        <div class="log-header">
+                            <h4>시스템 로그</h4>
+                            <div class="log-controls">
+                                <button class="btn-sm btn-gray" onclick="exportLogs()">로그 내보내기</button>
+                                <button class="btn-sm btn-red" onclick="clearLogs()">로그 삭제</button>
+                            </div>
+                        </div>
+                        <div id="system-logs" class="log-window">
+                            <span class="log-entry info">시스템 시작됨</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SignalScanner 섹션 -->
+                <div id="scanner" class="content-section">
+                    <h2 class="text-3xl font-bold mb-6">📡 실시간 시그널 감시</h2>
+                    
+                    <!-- 종목 추가 -->
+                    <div class="card mb-6">
+                        <h3 class="text-lg font-semibold mb-4">감시 종목 관리</h3>
+                        <div class="flex gap-4 mb-4">
+                            <input type="text" id="ticker-input" placeholder="종목 심볼 (예: AAPL)" 
+                                   class="input flex-1" maxlength="5">
+                            <button id="add-ticker-btn" class="btn-blue">추가</button>
+                        </div>
+                        
+                        <!-- 현재 감시 중인 종목들 -->
+                        <div id="watchlist-container" class="mb-4">
+                            <p class="text-sm text-slate-400 mb-2">현재 감시 중인 종목:</p>
+                            <div id="ticker-list" class="ticker-container"></div>
+                        </div>
+                        
+                        <!-- 스캐너 제어 -->
+                        <div class="flex gap-4">
+                            <button id="start-scanner-btn" class="btn-green">스캐너 시작</button>
+                            <button id="stop-scanner-btn" class="btn-red" disabled>스캐너 정지</button>
+                        </div>
+                    </div>
+
+                    <!-- 실시간 신호 디스플레이 -->
+                    <div class="card">
+                        <h3 class="text-lg font-semibold mb-4">실시간 신호</h3>
+                        <div id="signal-display" class="log-window">
+                            <p class="text-gray-500">스캐너가 활성화되면 신호가 여기에 표시됩니다...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 승인 워크플로우 섹션 -->
+                <div id="approval" class="content-section">
+                    <h2 class="text-3xl font-bold mb-6">🔍 검역 전략 검토</h2>
+                    
+                    <!-- 검역 큐 테이블 -->
+                    <div class="card">
+                        <h3 class="text-lg font-semibold mb-4">검역 큐 (Quarantine Queue)</h3>
+                        <div class="table-container">
+                            <table id="approval-table">
+                                <thead>
+                                    <tr>
+                                        <th>분자 ID</th>
+                                        <th>분자 이름</th>
+                                        <th>WFO 상태</th>
+                                        <th>WFO 효율성</th>
+                                        <th>생성일</th>
+                                        <th>액션</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="6" class="text-center text-slate-400">검역 큐가 비어있습니다</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MetaLearner 섹션 -->
+                <div id="metalearner" class="content-section">
+                    <h2 class="text-3xl font-bold mb-6">🧠 MetaLearner (복기/피드백)</h2>
+                    
+                    <!-- 대기 중인 예측 -->
+                    <div class="card">
+                        <h3 class="text-lg font-semibold mb-4">복기 대기 중인 예측</h3>
+                        <div class="table-container">
+                            <table id="pending-predictions-table">
+                                <thead>
+                                    <tr>
+                                        <th>예측 ID</th>
+                                        <th>종목</th>
+                                        <th>분자 ID</th>
+                                        <th>예측 요약</th>
+                                        <th>예측 시간</th>
+                                        <th>액션</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="6" class="text-center text-slate-400">복기할 예측이 없습니다</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LogicDiscoverer 섹션 -->
+                <div id="discovery" class="content-section">
+                    <h2 class="text-3xl font-bold mb-6">🧬 LogicDiscoverer (AI 전략 제안)</h2>
+                    
+                    <!-- 패턴 분석 요청 -->
+                    <div class="card mb-6">
+                        <h3 class="text-lg font-semibold mb-4">패턴 분석 및 전략 생성</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="label">종목 심볼</label>
+                                <input type="text" id="analysis-ticker" placeholder="예: AAPL" class="input">
+                            </div>
+                            <div>
+                                <label class="label">날짜</label>
+                                <input type="date" id="analysis-date" class="input">
+                            </div>
+                            <div>
+                                <label class="label">트레이더의 통찰</label>
+                                <textarea id="analysis-insight" placeholder="예: 장 초반 강력한 거래량과 함께 VWAP을 돌파한 후, 첫 20EMA 눌림목에서 강하게 반등했습니다..." 
+                                         class="input" rows="4"></textarea>
+                            </div>
+                            <button id="analyze-btn" class="btn-purple">분석 요청</button>
+                        </div>
+                    </div>
+
+                    <!-- 분석 결과 -->
+                    <div id="analysis-result-container" class="card hidden">
+                        <h3 class="text-lg font-semibold mb-4">AI 분석 결과</h3>
+                        <div id="analysis-result" class="prose max-w-none"></div>
+                    </div>
+                </div>
+
+                <!-- 설정 섹션 -->
+                <div id="settings" class="content-section">
+                    <h2 class="text-3xl font-bold mb-6">⚙️ API/서비스 설정</h2>
+                    
+                    <!-- API 키 설정 -->
+                    <div class="card mb-6">
+                        <h3 class="text-lg font-semibold mb-4">API 키 관리</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="label">Alpaca API Key</label>
+                                <input type="password" id="alpaca-key" placeholder="PKxxxxxxxxxxxxxx" class="input">
+                            </div>
+                            <div>
+                                <label class="label">Alpaca API Secret</label>
+                                <input type="password" id="alpaca-secret" placeholder="xxxxxxxxxxxxxxxx" class="input">
+                            </div>
+                            <div>
+                                <label class="label">Gemini API Key</label>
+                                <input type="password" id="gemini-key" placeholder="AIxxxxxxxxxxxxxx" class="input">
+                            </div>
+                            <div>
+                                <label class="label">Google Sheets ID</label>
+                                <input type="text" id="sheets-id" placeholder="1ABcDefGhIjKlMnOpQrStUvWxYz" class="input">
+                            </div>
+                            <div>
+                                <label class="label">Google Service Account JSON</label>
+                                <textarea id="service-account-json" placeholder='{"type": "service_account", ...}' 
+                                         class="input" rows="3"></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-4 mt-6">
+                            <button id="save-api-btn" class="btn-blue">설정 저장</button>
+                            <button id="test-connection-btn" class="btn-gray">연결 테스트</button>
+                            <button id="init-system-btn" class="btn-green">시스템 초기화</button>
+                            <button id="connect-ws-btn" class="btn-yellow">WebSocket 재연결</button>
+                        </div>
+                    </div>
+
+                    <!-- 설정 상태 -->
+                    <div id="settings-status" class="card">
+                        <h3 class="text-lg font-semibold mb-4">설정 상태</h3>
+                        <div id="settings-info" class="text-sm text-slate-400">
+                            <p>설정을 저장하면 상태가 여기에 표시됩니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-  </nav>
 
-  <!-- 메인 콘텐츠 섹션 -->
-  <div id="main" class="section" style="display:none;">
-    <div class="container">
-
-      <!-- 대시보드 -->
-      <section id="dashboard" class="content-section active">
-        <h2 class="section-title">📊 대시보드</h2>
-        <div class="dashboard-cards">
-          <div class="dashboard-card">
-            <div>시스템 상태: <span id="connection-status" class="status-indicator">-</span></div>
-            <div>초기화: <span id="system-initialized">-</span></div>
-            <div>스캐너: <span id="system-scanning">-</span></div>
-            <div>감시 종목: <span id="ticker-count">0</span></div>
-            <div>아톰 수: <span id="atoms-count">0</span></div>
-            <div>분자 수: <span id="molecules-count">0</span></div>
-            <div>업타임: <span id="system-uptime">-</span></div>
-          </div>
-          <div class="dashboard-card">
-            <div class="mb-2">서비스 연결상태</div>
-            <div>Sheets: <span id="sheets-status" class="status-indicator">-</span></div>
-            <div>Gemini: <span id="gemini-status" class="status-indicator">-</span></div>
-            <div>Alpaca: <span id="alpaca-status" class="status-indicator">-</span></div>
-          </div>
-        </div>
-        <div class="dashboard-log">
-          <h3>최근 신호</h3>
-          <div id="signals-display"></div>
-        </div>
-        <div class="dashboard-log">
-          <h3>시스템 로그</h3>
-          <div id="log-display"></div>
-          <div class="log-actions">
-            <button onclick="exportLogs()" class="btn">로그 내보내기</button>
-            <button onclick="clearLogs()" class="btn">로그 삭제</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- SignalScanner -->
-      <section id="scanner" class="content-section" style="display:none;">
-        <h2 class="section-title">📡 실시간 시그널 감시</h2>
-        <div class="scanner-controls">
-          <input id="ticker-input" type="text" class="input" placeholder="티커 입력" autocomplete="off" />
-          <button id="add-ticker-btn" class="btn">추가</button>
-          <div id="watchlist" class="watchlist"></div>
-          <button id="start-scanner-btn" class="btn btn-start">스캐너 시작</button>
-          <button id="stop-scanner-btn" class="btn btn-stop">스캐너 정지</button>
-        </div>
-      </section>
-
-      <!-- 승인 워크플로우 -->
-      <section id="approval" class="content-section" style="display:none;">
-        <h2 class="section-title">🔍 검역 전략 검토</h2>
-        <div>
-          <table id="approval-table" class="table">
-            <!-- 동적으로 생성됨 -->
-          </table>
-        </div>
-      </section>
-
-      <!-- MetaLearner -->
-      <section id="meta" class="content-section" style="display:none;">
-        <h2 class="section-title">🧠 MetaLearner (복기/피드백)</h2>
-        <div>
-          <table id="meta-table" class="table">
-            <!-- 동적으로 생성됨 -->
-          </table>
-        </div>
-      </section>
-
-      <!-- LogicDiscoverer -->
-      <section id="logic" class="content-section" style="display:none;">
-        <h2 class="section-title">🧬 LogicDiscoverer (AI 전략 제안)</h2>
-        <form id="logic-form" onsubmit="return false;">
-          <input id="analysis-ticker" type="text" class="input" placeholder="티커 입력" autocomplete="off" />
-          <input id="analysis-date" type="date" class="input" />
-          <input id="analysis-context" type="text" class="input" placeholder="사용자 통찰 입력" autocomplete="off" />
-          <button id="analyze-btn" class="btn">분석 요청</button>
-        </form>
-        <div id="analysis-result"></div>
-      </section>
-
-      <!-- 설정 -->
-      <section id="settings" class="content-section" style="display:none;">
-        <h2 class="section-title">⚙️ API/서비스 설정</h2>
-        <div class="settings-box">
-          <label for="alpaca-key">Alpaca API Key</label>
-          <input id="alpaca-key" type="text" class="input" autocomplete="off" />
-          <label for="alpaca-secret">Alpaca API Secret</label>
-          <input id="alpaca-secret" type="text" class="input" autocomplete="off" />
-          <label for="gemini-key">Gemini API Key</label>
-          <input id="gemini-key" type="text" class="input" autocomplete="off" />
-          <label for="sheets-id">Google Sheets ID</label>
-          <input id="sheets-id" type="text" class="input" autocomplete="off" />
-          <label for="google-service-account">Google Service Account JSON</label>
-          <textarea id="google-service-account" class="input" rows="3"></textarea>
-          <div class="settings-actions">
-            <button id="save-api-btn" class="btn">설정 저장</button>
-            <button id="test-connection-btn" class="btn">연결 테스트</button>
-            <button id="init-system-btn" class="btn">시스템 초기화</button>
-            <button id="connect-ws-btn" class="btn">WebSocket 재연결</button>
-          </div>
-        </div>
-      </section>
-    </div>
-  </div>
-
-  <script src="app.js"></script>
+    <!-- JavaScript -->
+    <script src="app.js"></script>
 </body>
 </html>

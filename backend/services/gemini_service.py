@@ -6,6 +6,8 @@ AI 트레이딩 어시스턴트 V5.1의 AI 분석 엔진
 - LogicDiscoverer: 패턴 분석 및 신규 아톰/분자 제안
 - MetaLearner: 예측 복기 및 성장 분석
 - 구조화된 프롬프트 생성 및 응답 파싱
+
+2025-08-01 최신 (프롬프트 강화)
 """
 
 import asyncio
@@ -135,12 +137,11 @@ class GeminiService:
     
     def _generate_pattern_analysis_prompt(self, ticker: str, date: str, 
                                         user_insight: str, chart_data: pd.DataFrame = None) -> str:
-        """패턴 분석을 위한 프롬프트 생성 (기획서 표 4.1/4.2 요구사항 반영)"""
+        """패턴 분석을 위한 프롬프트 생성 (프롬프트 강화)"""
         
         # 차트 데이터 요약 생성
         chart_summary = ""
         if chart_data is not None and not chart_data.empty:
-            # 핵심 매매 시간대 필터링 (21:00-00:30 KST)
             filtered_data = self._filter_core_trading_hours(chart_data)
             chart_summary = self._generate_chart_summary(filtered_data)
         else:
@@ -172,6 +173,10 @@ class GeminiService:
 2. 분자는 Quarantine_Queue로 자동 전송되어 WFO 테스트를 대기합니다.
 3. Created_Date(생성일), WFO_Score(기본 0.0) 등 표 4.1의 모든 핵심 필드를 포함해야 합니다.
 4. 아톰/분자 객체의 모든 필드는 완전한 JSON으로 반환해야 하며, 누락 없이 모든 값이 들어가야 합니다.
+
+**프롬프트 강화 요청사항:**
+- 사용자의 통찰을 바탕으로, 기존 아톰들을 어떻게 조합하면 좋을지, 또는 어떤 새로운 아톰이 필요할지 더 깊이 있게 분석하세요.
+- 단순하게 기존 아톰을 나열하지 말고, 실제 전략 개발자의 관점에서 필요한 조합/신규 아톰을 적극적으로 제안하세요.
 
 **응답 형식:**
 아래와 같이 반드시 완전한 JSON 형식으로만 응답하세요:
@@ -216,23 +221,17 @@ class GeminiService:
     def _filter_core_trading_hours(self, df: pd.DataFrame) -> pd.DataFrame:
         """핵심 매매 시간대 (21:00-00:30 KST) 필터링"""
         try:
-            # 시간 정보가 있는 경우만 필터링
             if 'datetime' in df.columns or df.index.name == 'datetime':
                 if 'datetime' in df.columns:
                     df['hour'] = pd.to_datetime(df['datetime']).dt.hour
                 else:
                     df['hour'] = df.index.hour
-                
-                # 21:00-23:59, 00:00-00:30 필터링
                 filtered_df = df[
                     (df['hour'] >= 21) | (df['hour'] == 0)
                 ].copy()
-                
                 return filtered_df
             else:
-                # 시간 정보가 없으면 전체 데이터 반환
                 return df
-                
         except Exception as e:
             logger.warning(f"시간대 필터링 실패: {e}")
             return df
@@ -242,8 +241,6 @@ class GeminiService:
         try:
             if df.empty:
                 return "필터링된 데이터가 없습니다."
-            
-            # 기본 통계
             summary = f"""
 **차트 데이터 요약 (핵심 매매 시간대):**
 - 데이터 포인트: {len(df)}개
@@ -257,16 +254,11 @@ class GeminiService:
 - 평균 거래량: {df['Volume'].mean():,.0f}
 - 최대 거래량: {df['Volume'].max():,}
 """
-            
-            # 기술적 지표 추가 (EMA가 있는 경우)
             if 'EMA_20' in df.columns:
                 summary += f"- 20EMA 종료: ${df['EMA_20'].iloc[-1]:.2f}\n"
-            
             if 'VWAP' in df.columns:
                 summary += f"- VWAP: ${df['VWAP'].iloc[-1]:.2f}\n"
-            
             return summary
-            
         except Exception as e:
             logger.error(f"차트 요약 생성 실패: {e}")
             return "차트 데이터 요약 생성 중 오류가 발생했습니다."
@@ -274,35 +266,23 @@ class GeminiService:
     def _parse_pattern_analysis_response(self, response_text: str) -> Dict:
         """패턴 분석 응답 파싱 - 검역 시스템 적용"""
         try:
-            # JSON 부분 추출
-            json_match = re.search(r'``````', response_text, re.DOTALL)
-            if not json_match:
-                json_match = re.search(r'(\{.*\})', response_text, re.DOTALL)
-
+            json_match = re.search(r'(\{.*\})', response_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
                 result = json.loads(json_str)
-
-                # 결과 검증
                 if not self._validate_pattern_analysis_result(result):
                     raise ValueError("응답 형식이 올바르지 않습니다")
-
-                # ⭐ 검역 시스템 적용: 모든 신규 분자를 quarantined 상태로 설정
                 if 'suggested_molecule' in result and result['suggested_molecule']:
                     result['suggested_molecule']['Status'] = 'quarantined'
                     result['suggested_molecule']['Created_Date'] = datetime.now(timezone.utc).isoformat()
                     result['suggested_molecule']['WFO_Score'] = 0.0
                     result['suggested_molecule']['Approved_Date'] = ''
                     result['suggested_molecule']['Approved_By'] = ''
-                
                     logger.info(f"새 분자를 검역소에 추가: {result['suggested_molecule'].get('molecule_id')}")
-
                 result['success'] = True
                 result['raw_response'] = response_text
                 return result
-
             else:
-                # JSON이 없는 경우 텍스트 분석 결과로 반환
                 return {
                     'success': True,
                     'analysis': response_text,
@@ -310,7 +290,6 @@ class GeminiService:
                     'suggested_molecule': None,
                     'raw_response': response_text
                 }
-
         except json.JSONDecodeError as e:
             logger.error(f"JSON 파싱 실패: {e}")
             return {
@@ -318,7 +297,6 @@ class GeminiService:
                 'error': f"JSON 파싱 오류: {str(e)}",
                 'raw_response': response_text
             }
-    
         except Exception as e:
             logger.error(f"응답 파싱 실패: {e}")
             return {
@@ -330,30 +308,23 @@ class GeminiService:
     def _validate_pattern_analysis_result(self, result: Dict) -> bool:
         """패턴 분석 결과 검증"""
         try:
-            # 필수 필드 확인
             required_fields = ['analysis']
             for field in required_fields:
                 if field not in result:
                     return False
-            
-            # 아톰 구조 검증
             if 'suggested_atoms' in result and isinstance(result['suggested_atoms'], list):
                 for atom in result['suggested_atoms']:
                     required_atom_fields = ['atom_id', 'atom_name', 'category']
                     for field in required_atom_fields:
                         if field not in atom:
                             return False
-            
-            # 분자 구조 검증
             if 'suggested_molecule' in result and result['suggested_molecule']:
                 molecule = result['suggested_molecule']
                 required_molecule_fields = ['molecule_id', 'molecule_name', 'category']
                 for field in required_molecule_fields:
                     if field not in molecule:
                         return False
-            
             return True
-            
         except Exception:
             return False
     
@@ -376,23 +347,15 @@ class GeminiService:
             Dict: 복기 분석 결과 및 개선 제안
         """
         try:
-            # 프롬프트 생성
             prompt = self._generate_review_analysis_prompt(
                 prediction_data, actual_outcome, sidb_records, chart_data
             )
-            
-            # Gemini AI 호출
             response = self.model.generate_content(prompt)
-            
             if not response or not response.text:
                 raise ValueError("Gemini AI로부터 응답을 받지 못했습니다")
-            
-            # 응답 파싱
             result = self._parse_review_analysis_response(response.text)
-            
             logger.info(f"예측 복기 분석 완료: {prediction_data.get('Ticker')} - {prediction_data.get('Triggered_Molecule_ID')}")
             return result
-            
         except Exception as e:
             logger.error(f"예측 복기 분석 실패: {e}")
             return {
@@ -405,23 +368,18 @@ class GeminiService:
                                        actual_outcome: str,
                                        sidb_records: List[Dict] = None,
                                        chart_data: pd.DataFrame = None) -> str:
-        """복기 분석을 위한 프롬프트 생성 (기획서 5.2장 심층 분석/회피분자 생성 요청 포함)"""
-        
-        # SIDB 기록 요약
+        """복기 분석을 위한 프롬프트 생성 (프롬프트 강화)"""
         sidb_summary = ""
         if sidb_records:
             sidb_summary = self._generate_sidb_summary(sidb_records)
         else:
             sidb_summary = "SIDB 기록이 제공되지 않았습니다."
-        
-        # 차트 데이터 요약
         chart_summary = ""
         if chart_data is not None and not chart_data.empty:
             filtered_data = self._filter_core_trading_hours(chart_data)
             chart_summary = self._generate_chart_summary(filtered_data)
         else:
             chart_summary = "차트 데이터가 제공되지 않았습니다."
-        
         prompt = f"""
 당신은 전문 트레이딩 시스템 분석가이자 MetaLearner 엔진입니다. 아래 예측에 대한 심층적인 복기 분석과 전략 개선을 수행해주세요.
 
@@ -443,10 +401,11 @@ class GeminiService:
 
 **분석 요청사항(기획서 5.2장 반영):**
 1. 예측의 정확도 및 실패의 근본 원인(시스템적/심리적/시장 환경 등)을 다면적으로 분석하세요.
-2. 단순한 결과 평가를 넘어, 분자의 핵심 구조나 임계값, 필터, 진입 조건을 근본적으로 어떻게 바꿀 수 있을지 제안하세요.
-3. 필요하다면 기존 분자를 수정하거나, 신규 회피(AVD) 분자(패턴 회피/위험관리용) 전략을 제안하세요.
-4. 개선안은 실제 시스템에 적용 가능하도록 구체적으로 작성하세요.
-5. 모든 분석/제안은 JSON 형식으로 아래와 같이 반환하세요.
+2. 기존 분자 구조나 임계값, 필터, 진입 조건을 어떻게 바꿀 수 있을지 구체적으로 제안하세요.
+3. 필요하다면 기존 분자를 수정하거나, 신규 회피/위험관리(AVD) 분자(패턴 회피/위험관리용) 전략을 구체적인 JSON 형식으로 제안하세요.
+4. 특히, 실패의 근본 원인을 바탕으로 이 실패를 막기 위한 새로운 '회피/위험관리(AVD)' 분자를 반드시 JSON으로 제안해 주세요.
+5. 개선안은 실제 시스템에 적용 가능하도록 구체적으로 작성하세요.
+6. 모든 분석/제안은 JSON 형식으로 아래와 같이 반환하세요.
 
 **JSON 응답 형식 예시:**
 {{
@@ -495,7 +454,7 @@ class GeminiService:
 
 **특별 지침:**
 - 실패의 근본 원인을 반드시 심층적으로 분석하세요.
-- 필요시 신규 회피(AVD) 분자 전략을 제안해야 합니다(구조, 필드, 검역 상태 포함).
+- 반드시 '실패를 막기 위한 신규 회피/위험관리(AVD) 분자'를 구체적인 JSON으로 제안하세요.
 - 모든 제안은 실제 시스템에 적용 가능한 형태로 작성하세요.
 - JSON 필드와 구조를 엄격히 지켜주세요.
 
@@ -508,36 +467,26 @@ class GeminiService:
         try:
             if not sidb_records:
                 return "SIDB 기록이 없습니다."
-            
-            # 시간순 정렬
             sorted_records = sorted(
                 sidb_records, 
                 key=lambda x: x.get('Timestamp_UTC', '')
             )
-            
             summary = f"**SIDB 기록 ({len(sorted_records)}개):**\n"
-            
-            for record in sorted_records[:10]:  # 최대 10개만 표시
+            for record in sorted_records[:10]:
                 timestamp = record.get('Timestamp_UTC', 'Unknown')
                 ticker = record.get('Ticker', 'Unknown')
                 atom_id = record.get('Atom_ID', 'Unknown')
                 price = record.get('Price_At_Signal', 0)
                 volume = record.get('Volume_At_Signal', 0)
-                
                 try:
-                    # 시간 형식 변환
                     dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                     time_str = dt.strftime('%H:%M:%S')
                 except:
                     time_str = timestamp
-                
                 summary += f"- [{time_str}] {ticker}: {atom_id} | ${price:.2f} | Vol: {volume:,}\n"
-            
             if len(sorted_records) > 10:
                 summary += f"... (총 {len(sorted_records)}개 중 10개만 표시)\n"
-            
             return summary
-            
         except Exception as e:
             logger.error(f"SIDB 요약 생성 실패: {e}")
             return "SIDB 기록 요약 생성 중 오류가 발생했습니다."
@@ -545,26 +494,19 @@ class GeminiService:
     def _parse_review_analysis_response(self, response_text: str) -> Dict:
         """복기 분석 응답 파싱"""
         try:
-            # JSON 부분 추출
-            json_match = re.search(r'``````', response_text, re.DOTALL)
-            if not json_match:
-                json_match = re.search(r'(\{.*\})', response_text, re.DOTALL)
-            
+            json_match = re.search(r'(\{.*\})', response_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
                 result = json.loads(json_str)
-                
                 result['success'] = True
                 result['raw_response'] = response_text
                 return result
             else:
-                # JSON이 없는 경우 텍스트 리포트로 반환
                 return {
                     'success': True,
                     'review_summary': response_text,
                     'raw_response': response_text
                 }
-                
         except json.JSONDecodeError as e:
             logger.error(f"JSON 파싱 실패: {e}")
             return {
@@ -647,35 +589,23 @@ class GeminiService:
 # 사용 예시
 if __name__ == "__main__":
     async def test_gemini_service():
-        # 환경 변수에서 API 키 로드
         api_key = os.getenv('GEMINI_API_KEY')
-        
         if not api_key:
             print("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.")
             return
-        
-        # 서비스 초기화
         gemini_service = GeminiService(api_key=api_key)
-        
-        # 연결 테스트
         if await gemini_service.test_connection():
             print("✅ Gemini AI 연결 성공")
-            
-            # 패턴 분석 테스트
             result = await gemini_service.analyze_pattern(
                 ticker="TSLA",
                 date="2025-07-30",
                 user_insight="20EMA 지지 후 거래량이 급증하며 상승했습니다"
             )
-            
             if result['success']:
                 print("🧠 패턴 분석 성공")
                 print(f"분석 결과: {result['analysis'][:100]}...")
             else:
                 print(f"❌ 패턴 분석 실패: {result['error']}")
-                
         else:
             print("❌ Gemini AI 연결 실패")
-    
-    # 테스트 실행
     asyncio.run(test_gemini_service())

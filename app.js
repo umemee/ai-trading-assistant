@@ -1069,32 +1069,55 @@ document.addEventListener('DOMContentLoaded', function() {
     window.tradingAssistant = new TradingAssistant();
     
     // 전역 함수들 정의 (HTML에서 onclick 등으로 사용)
-    window.showSection = function(sectionId) {
+    window.showSection = function(sectionId, navBtn) {
         try {
-            // 모든 섹션 숨기기
+            // 모든 'section' 클래스를 가진 요소들을 숨깁니다.
             const sections = document.querySelectorAll('.section');
             sections.forEach(section => {
                 section.style.display = 'none';
             });
-            
-            // 모든 네비게이션 버튼 비활성화
-            const navButtons = document.querySelectorAll('.nav-btn');
-            navButtons.forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            // 선택된 섹션 표시
-            const targetSection = document.getElementById(`${sectionId}-section`);
-            if (targetSection) {
-                targetSection.style.display = 'block';
+
+            // 'main' 섹션을 보여줘야 할 경우, 특별히 처리합니다.
+            if (sectionId === 'main') {
+                const mainSection = document.getElementById('main');
+                if (mainSection) {
+                    mainSection.style.display = 'block';
+                }
+                // 비밀번호 모달은 숨깁니다.
+                const pwModal = document.getElementById('pw-modal');
+                if (pwModal) {
+                    pwModal.style.display = 'none';
+                }
+            } else {
+                // main 보이기
+                const mainSection = document.getElementById('main');
+                if (mainSection) {
+                    mainSection.style.display = 'block';
+                }
+                // 섹션 전환
+                const contentSections = document.querySelectorAll('.content-section');
+                contentSections.forEach(section => {
+                    section.classList.remove('active');
+                    section.style.display = 'none';
+                });
+                const navButtons = document.querySelectorAll('.nav-item');
+                navButtons.forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                const targetSection = document.getElementById(sectionId);
+                if (targetSection) {
+                    targetSection.classList.add('active');
+                    targetSection.style.display = 'block';
+                }
+                if (navBtn) {
+                    navBtn.classList.add('active');
+                } else {
+                    const navButton = document.querySelector(`.nav-item[onclick="showSection('${sectionId}', this)"]`);
+                    if (navButton) {
+                        navButton.classList.add('active');
+                    }
+                }
             }
-            
-            // 해당 네비게이션 버튼 활성화
-            const navButton = document.querySelector(`[onclick="showSection('${sectionId}')"]`);
-            if (navButton) {
-                navButton.classList.add('active');
-            }
-            
         } catch (error) {
             console.error('섹션 표시 오류:', error);
         }

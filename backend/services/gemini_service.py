@@ -21,7 +21,6 @@ import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import pandas as pd
 
-# 로깅 설정
 logger = logging.getLogger(__name__)
 
 class GeminiService:
@@ -136,7 +135,7 @@ class GeminiService:
     
     def _generate_pattern_analysis_prompt(self, ticker: str, date: str, 
                                         user_insight: str, chart_data: pd.DataFrame = None) -> str:
-        """패턴 분석을 위한 프롬프트 생성"""
+        """패턴 분석을 위한 프롬프트 생성 (기획서 표 4.1/4.2 요구사항 반영)"""
         
         # 차트 데이터 요약 생성
         chart_summary = ""
@@ -147,7 +146,8 @@ class GeminiService:
         else:
             chart_summary = "차트 데이터가 제공되지 않았습니다."
         
-        prompt = f"""당신은 전문 트레이딩 시스템 개발자입니다. 다음 정보를 분석하여 새로운 '아톰(Atom)'과 '분자(Molecule)'를 제안해주세요.
+        prompt = f"""
+당신은 AI 트레이딩 시스템의 핵심 전략 연구원입니다. 아래 정보를 분석하여 새로운 '아톰(Atom)'과 '분자(Molecule)'를 제안해주세요.
 
 **분석 대상:**
 - 종목: {ticker}
@@ -158,7 +158,7 @@ class GeminiService:
 {chart_summary}
 
 **아톰-분자 시스템 설명:**
-- 아톰: 시장의 객관적 현상을 정의하는 최소 단위 (예: "1분_20EMA_지지", "거래량_폭발")
+- 아톰: 시장의 객관적 현상을 정의하는 최소 단위 (예: '1분_20EMA_지지', '거래량_폭발')
 - 분자: 여러 아톰의 조합으로 구성되는 완성된 매매 전략
 
 **기존 아톰 카테고리:**
@@ -167,8 +167,14 @@ class GeminiService:
 - Trigger: 진입 신호 (TRG-XXX)
 - Derived: 파생/컨버전스 (DRV-XXX)
 
+**중요 원칙:**
+1. 분자의 최초 생성 시 Status는 반드시 'quarantined'(검역)로 설정합니다.
+2. 분자는 Quarantine_Queue로 자동 전송되어 WFO 테스트를 대기합니다.
+3. Created_Date(생성일), WFO_Score(기본 0.0) 등 표 4.1의 모든 핵심 필드를 포함해야 합니다.
+4. 아톰/분자 객체의 모든 필드는 완전한 JSON으로 반환해야 하며, 누락 없이 모든 값이 들어가야 합니다.
+
 **응답 형식:**
-반드시 다음 JSON 형식으로만 응답하세요:
+아래와 같이 반드시 완전한 JSON 형식으로만 응답하세요:
 {{
 "analysis": "상세한 기술적 분석 내용 (한국어)",
 "suggested_atoms": [
@@ -188,19 +194,23 @@ class GeminiService:
 "category": "진입/반등/회피/위험관리 중 하나",
 "required_atom_ids": ["필요한_아톰_ID들"],
 "match_threshold": 90,
-"translation_notes": "전략의 핵심 뉘앙스와 사용법 (한국어)"
+"translation_notes": "전략의 핵심 뉘앙스와 사용법 (한국어)",
+"Status": "quarantined",
+"Created_Date": "{datetime.now(timezone.utc).isoformat()}",
+"WFO_Score": 0.0,
+"Approved_Date": "",
+"Approved_By": ""
 }}
 }}
 
-**중요 지침:**
-1. 사용자의 통찰을 기반으로 구체적이고 실용적인 아톰을 제안하세요
-2. 아톰 ID는 기존 체계를 따라 생성하세요 (CTX-021, STR-020 등)
-3. 분자는 실제 매매에 사용할 수 있는 완성된 전략이어야 합니다
-4. 모든 설명은 한국어로 작성하세요
-5. JSON 형식을 정확히 지켜주세요
+**특별 지침:**
+- 신규 분자에는 무조건 Status: 'quarantined', Created_Date, WFO_Score 등 검역 관련 필드가 포함되어야 합니다.
+- 제안된 분자는 Quarantine_Queue로 전송된다고 가정합니다.
+- 모든 설명은 한국어로 작성하세요.
+- JSON 형식과 모든 필드 이름을 엄격히 지켜주세요.
 
-지금 분석을 시작하세요:"""
-
+지금 분석을 시작하세요:
+"""
         return prompt
     
     def _filter_core_trading_hours(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -261,9 +271,8 @@ class GeminiService:
             logger.error(f"차트 요약 생성 실패: {e}")
             return "차트 데이터 요약 생성 중 오류가 발생했습니다."
   
-    # gemini_service.py의 _parse_pattern_analysis_response 메서드 수정
     def _parse_pattern_analysis_response(self, response_text: str) -> Dict:
-    """패턴 분석 응답 파싱 - 검역 시스템 적용"""
+        """패턴 분석 응답 파싱 - 검역 시스템 적용"""
         try:
             # JSON 부분 추출
             json_match = re.search(r'``````', response_text, re.DOTALL)
@@ -396,7 +405,7 @@ class GeminiService:
                                        actual_outcome: str,
                                        sidb_records: List[Dict] = None,
                                        chart_data: pd.DataFrame = None) -> str:
-        """복기 분석을 위한 프롬프트 생성"""
+        """복기 분석을 위한 프롬프트 생성 (기획서 5.2장 심층 분석/회피분자 생성 요청 포함)"""
         
         # SIDB 기록 요약
         sidb_summary = ""
@@ -413,7 +422,8 @@ class GeminiService:
         else:
             chart_summary = "차트 데이터가 제공되지 않았습니다."
         
-        prompt = f"""당신은 전문 트레이딩 시스템 분석가입니다. 다음 예측에 대한 심층적인 복기 분석을 수행해주세요.
+        prompt = f"""
+당신은 전문 트레이딩 시스템 분석가이자 MetaLearner 엔진입니다. 아래 예측에 대한 심층적인 복기 분석과 전략 개선을 수행해주세요.
 
 **원본 예측 정보:**
 - 종목: {prediction_data.get('Ticker')}
@@ -431,33 +441,46 @@ class GeminiService:
 **실제 차트 데이터:**
 {chart_summary}
 
-**분석 요청사항:**
-1. 예측의 정확도 평가
-2. 성공/실패 원인 분석
-3. 놓친 신호나 잘못 해석한 부분
-4. 시스템 개선 제안
-5. 해당 분자 전략의 신뢰도 평가
+**분석 요청사항(기획서 5.2장 반영):**
+1. 예측의 정확도 및 실패의 근본 원인(시스템적/심리적/시장 환경 등)을 다면적으로 분석하세요.
+2. 단순한 결과 평가를 넘어, 분자의 핵심 구조나 임계값, 필터, 진입 조건을 근본적으로 어떻게 바꿀 수 있을지 제안하세요.
+3. 필요하다면 기존 분자를 수정하거나, 신규 회피(AVD) 분자(패턴 회피/위험관리용) 전략을 제안하세요.
+4. 개선안은 실제 시스템에 적용 가능하도록 구체적으로 작성하세요.
+5. 모든 분석/제안은 JSON 형식으로 아래와 같이 반환하세요.
 
-**응답 형식:**
-반드시 다음 JSON 형식으로만 응답하세요:
+**JSON 응답 형식 예시:**
 {{
 "review_summary": "복기 분석 요약 (한국어)",
 "accuracy_assessment": {{
 "prediction_accuracy": "정확/부정확/부분적",
 "confidence_score": 0.85,
-"key_factors": ["성공/실패에 영향을 준 주요 요소들"]
+"key_factors": ["성공/실패에 영향을 준 주요 요인들"]
 }},
 "detailed_analysis": {{
 "what_worked": "잘 작동한 부분 (한국어)",
 "what_failed": "실패한 부분 (한국어)",
 "missed_signals": "놓친 신호들 (한국어)",
-"timing_analysis": "타이밍 분석 (한국어)"
+"timing_analysis": "타이밍 분석 (한국어)",
+"root_cause_analysis": "실패의 근본 원인(구조적/심리적/시장 환경 등)"
 }},
 "improvement_suggestions": {{
 "molecule_adjustments": "분자 전략 수정 제안 (한국어)",
 "threshold_changes": "임계값 변경 제안",
 "new_filters": "추가 필터 제안 (한국어)",
-"risk_management": "리스크 관리 개선안 (한국어)"
+"risk_management": "리스크 관리 개선안 (한국어)",
+"new_avoidance_molecule": {{
+    "molecule_id": "신규_AVD_분자_ID(예: LOGIC-AVD-011)",
+    "molecule_name": "회피/위험관리 전략 이름",
+    "category": "회피/위험관리",
+    "required_atom_ids": ["필요한_아톰_ID들"],
+    "match_threshold": 90,
+    "translation_notes": "전략의 핵심 뉘앙스와 사용법 (한국어)",
+    "Status": "quarantined",
+    "Created_Date": "{datetime.now(timezone.utc).isoformat()}",
+    "WFO_Score": 0.0,
+    "Approved_Date": "",
+    "Approved_By": ""
+}}
 }},
 "system_learning": {{
 "pattern_insights": "새로 발견한 패턴 (한국어)",
@@ -470,15 +493,14 @@ class GeminiService:
 }}
 }}
 
-**중요 지침:**
-1. 객관적이고 균형잡힌 분석을 제공하세요
-2. 구체적인 개선안을 제시하세요
-3. 모든 내용은 한국어로 작성하세요
-4. JSON 형식을 정확히 지켜주세요
-5. 수치적 평가도 포함하세요
+**특별 지침:**
+- 실패의 근본 원인을 반드시 심층적으로 분석하세요.
+- 필요시 신규 회피(AVD) 분자 전략을 제안해야 합니다(구조, 필드, 검역 상태 포함).
+- 모든 제안은 실제 시스템에 적용 가능한 형태로 작성하세요.
+- JSON 필드와 구조를 엄격히 지켜주세요.
 
-지금 분석을 시작하세요:"""
-
+분석을 시작하세요:
+"""
         return prompt
     
     def _generate_sidb_summary(self, sidb_records: List[Dict]) -> str:

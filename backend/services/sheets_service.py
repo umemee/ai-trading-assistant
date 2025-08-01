@@ -1,5 +1,3 @@
-# services/sheets_service.py (전체 복사본)
-
 import asyncio
 import json
 import logging
@@ -33,11 +31,10 @@ class SheetsService:
         self.SIDB = "SIDB"
         self.PERFORMANCE_DASHBOARD = "Performance_Dashboard"
         self.PREDICTION_NOTES = "Prediction_Notes"
-        # 부가 시트 (있으면 사용)
-        self.QUARANTINE_QUEUE = "QuarantineQueue"
-        self.APPROVAL_LOG = "ApprovalLog"
-        self.VERSION_HISTORY = "VersionHistory"
-        self.RISK_ALERTS = "RiskAlerts"
+        self.QUARANTINE_QUEUE = "Quarantine_Queue"
+        self.APPROVAL_LOG = "Approval_Log"
+        self.VERSION_HISTORY = "Version_History"
+        self.RISK_ALERTS = "Risk_Alerts"
         self.WFO_RESULTS = "WFO_Results"
         self._initialize_service(service_account_json)
 
@@ -188,6 +185,39 @@ class SheetsService:
             return True
         except Exception as e:
             logger.error(f"분자 추가 실패: {e}")
+            return False
+
+    async def update_molecule_info(self, molecule_id: str, update_data: Dict) -> bool:
+        """Molecule_DB에서 특정 Molecule_ID의 정보 업데이트"""
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.MOLECULE_DB}!A:Q"
+            ).execute()
+            values = result.get('values', [])
+            headers = values[0]
+            for i, row in enumerate(values[1:], start=2):
+                while len(row) < len(headers):
+                    row.append('')
+                if row[0] == molecule_id:
+                    # 업데이트할 값 적용
+                    for key, val in update_data.items():
+                        if key in headers:
+                            idx = headers.index(key)
+                            row[idx] = val
+                    body = {"values": [row]}
+                    self.service.spreadsheets().values().update(
+                        spreadsheetId=self.spreadsheet_id,
+                        range=f"{self.MOLECULE_DB}!A{i}",
+                        valueInputOption="RAW",
+                        body=body
+                    ).execute()
+                    logger.info(f"Molecule_DB 업데이트: {molecule_id}")
+                    return True
+            logger.warning(f"업데이트할 분자 ID를 찾지 못함: {molecule_id}")
+            return False
+        except Exception as e:
+            logger.error(f"Molecule_DB 업데이트 실패: {e}")
             return False
 
     # ================== SIDB 관리 ==================
@@ -439,6 +469,237 @@ class SheetsService:
         except Exception as e:
             logger.error(f"예측 결과 업데이트 실패: {e}")
             return False
+
+    # ================== Quarantine_Queue 관리 ==================
+    async def get_quarantine_queue(self) -> List[Dict]:
+        """Quarantine_Queue에서 검증 대기중인 분자 목록 가져오기"""
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.QUARANTINE_QUEUE}!A:Z"
+            ).execute()
+            values = result.get('values', [])
+            if not values or len(values) < 2:
+                return []
+            headers = values[0]
+            queue_data = []
+            for row in values[1:]:
+                while len(row) < len(headers):
+                    row.append('')
+                item = dict(zip(headers, row))
+                queue_data.append(item)
+            logger.info(f"Quarantine_Queue에서 {len(queue_data)}개 전략 로드")
+            return queue_data
+        except Exception as e:
+            logger.error(f"Quarantine_Queue 로드 실패: {e}")
+            return []
+
+    # ================== WFO_Results 관리 ==================
+    async def save_wfo_result(self, result_data: Dict) -> bool:
+        """WFO 결과를 WFO_Results 시트에 저장"""
+        try:
+            result_data = {k: v for k, v in result_data.items()}
+            current_results = await self.get_wfo_results()
+            next_row = len(current_results) + 2
+            # 표 4.1: Result_ID, Molecule_ID, WFO_Efficiency 등
+            values = [
+                result_data.get('Result_ID', str(uuid.uuid4())),
+                result_data.get('Molecule_ID', ''),
+                result_data.get('Test_Date', datetime.now(timezone.utc).isoformat()),
+                result_data.get('WFO_Efficiency', 0.0),
+                result_data.get('Validation_Status', ''),
+                result_data.get('Simple_Return', 0.0),
+                result_data.get('WFO_Return', 0.0),
+                result_data.get('Max_Drawdown', 0.0),
+                result_data.get('Sharpe_Ratio', 0.0),
+                result_data.get('Parameter_Stability_Score', 0.0)
+            ]
+            result = self.service.spreadsheets().values().append(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.WFO_RESULTS}!A:J",
+                valueInputOption='RAW',
+                body={'values': [values]}
+            ).execute()
+            logger.info(f"WFO 결과 저장: {result_data.get('Molecule_ID')}")
+            return True
+        except Exception as e:
+            logger.error(f"WFO 결과 저장 실패: {e}")
+            return False
+
+    async def get_wfo_results(self) -> List[Dict]:
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.WFO_RESULTS}!A:J"
+            ).execute()
+            values = result.get('values', [])
+            if len(values) < 2:
+                return []
+            headers = values[0]
+            results = []
+            for row in values[1:]:
+                while len(row) < len(headers):
+                    row.append('')
+                item = dict(zip(headers, row))
+                results.append(item)
+            logger.info(f"WFO_Results {len(results)}개 로드")
+            return results
+        except Exception as e:
+            logger.error(f"WFO_Results 조회 실패: {e}")
+            return []
+
+    # ================== Approval_Log 관리 ==================
+    async def log_approval_action(self, log_data: Dict) -> bool:
+        """분자 승인/거부 기록을 Approval_Log에 저장"""
+        try:
+            current_logs = await self.get_approval_logs()
+            next_row = len(current_logs) + 2
+            # 표 4.1: Log_ID, Molecule_ID, Action, Reviewer, Review_Notes, Previous_Status, New_Status
+            values = [
+                log_data.get('Log_ID', str(uuid.uuid4())),
+                log_data.get('Molecule_ID', ''),
+                log_data.get('Action', ''),
+                log_data.get('Reviewer', ''),
+                log_data.get('Review_Notes', ''),
+                log_data.get('Previous_Status', ''),
+                log_data.get('New_Status', ''),
+                log_data.get('Timestamp', datetime.now(timezone.utc).isoformat())
+            ]
+            result = self.service.spreadsheets().values().append(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.APPROVAL_LOG}!A:H",
+                valueInputOption='RAW',
+                body={'values': [values]}
+            ).execute()
+            logger.info(f"Approval_Log 기록 추가: {log_data.get('Molecule_ID')}")
+            return True
+        except Exception as e:
+            logger.error(f"Approval_Log 기록 추가 실패: {e}")
+            return False
+
+    async def get_approval_logs(self) -> List[Dict]:
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.APPROVAL_LOG}!A:H"
+            ).execute()
+            values = result.get('values', [])
+            if len(values) < 2:
+                return []
+            headers = values[0]
+            logs = []
+            for row in values[1:]:
+                while len(row) < len(headers):
+                    row.append('')
+                item = dict(zip(headers, row))
+                logs.append(item)
+            logger.info(f"Approval_Log {len(logs)}개 로드")
+            return logs
+        except Exception as e:
+            logger.error(f"Approval_Log 조회 실패: {e}")
+            return []
+
+    # ================== Risk_Alerts 관리 ==================
+    async def save_risk_alert(self, alert_data: Dict) -> bool:
+        """RiskMonitor의 자동 개입 조치를 Risk_Alerts에 기록"""
+        try:
+            current_alerts = await self.get_risk_alerts()
+            next_row = len(current_alerts) + 2
+            # 표 4.1: Alert_ID, Molecule_ID, Alert_Type, Auto_Action 등
+            values = [
+                alert_data.get('Alert_ID', str(uuid.uuid4())),
+                alert_data.get('Molecule_ID', ''),
+                alert_data.get('Alert_Type', ''),
+                alert_data.get('Alert_Level', ''),
+                alert_data.get('Current_Drawdown', 0.0),
+                alert_data.get('Alert_Details', ''),
+                alert_data.get('Triggered_Date', datetime.now(timezone.utc).isoformat()),
+                alert_data.get('Auto_Action', '')
+            ]
+            result = self.service.spreadsheets().values().append(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.RISK_ALERTS}!A:H",
+                valueInputOption='RAW',
+                body={'values': [values]}
+            ).execute()
+            logger.info(f"Risk_Alerts 기록 추가: {alert_data.get('Molecule_ID')}")
+            return True
+        except Exception as e:
+            logger.error(f"Risk_Alerts 기록 추가 실패: {e}")
+            return False
+
+    async def get_risk_alerts(self) -> List[Dict]:
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.RISK_ALERTS}!A:H"
+            ).execute()
+            values = result.get('values', [])
+            if len(values) < 2:
+                return []
+            headers = values[0]
+            alerts = []
+            for row in values[1:]:
+                while len(row) < len(headers):
+                    row.append('')
+                item = dict(zip(headers, row))
+                alerts.append(item)
+            logger.info(f"Risk_Alerts {len(alerts)}개 로드")
+            return alerts
+        except Exception as e:
+            logger.error(f"Risk_Alerts 조회 실패: {e}")
+            return []
+
+    # ================== Version_History 관리 ==================
+    async def save_version_record(self, version_data: Dict) -> bool:
+        """VersionController의 변경 이력을 Version_History에 기록"""
+        try:
+            current_versions = await self.get_version_history()
+            next_row = len(current_versions) + 2
+            # 표 4.1: History_ID, Molecule_ID, Changed_Fields, Old_Values, New_Values, Changed_By, Changed_Date, Change_Reason
+            values = [
+                version_data.get('History_ID', str(uuid.uuid4())),
+                version_data.get('Molecule_ID', ''),
+                version_data.get('Changed_Fields', ''),
+                version_data.get('Old_Values', ''),
+                version_data.get('New_Values', ''),
+                version_data.get('Changed_By', ''),
+                version_data.get('Changed_Date', datetime.now(timezone.utc).isoformat()),
+                version_data.get('Change_Reason', '')
+            ]
+            result = self.service.spreadsheets().values().append(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.VERSION_HISTORY}!A:H",
+                valueInputOption='RAW',
+                body={'values': [values]}
+            ).execute()
+            logger.info(f"Version_History 기록 추가: {version_data.get('Molecule_ID')}")
+            return True
+        except Exception as e:
+            logger.error(f"Version_History 기록 추가 실패: {e}")
+            return False
+
+    async def get_version_history(self) -> List[Dict]:
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.VERSION_HISTORY}!A:H"
+            ).execute()
+            values = result.get('values', [])
+            if len(values) < 2:
+                return []
+            headers = values[0]
+            versions = []
+            for row in values[1:]:
+                while len(row) < len(headers):
+                    row.append('')
+                item = dict(zip(headers, row))
+                versions.append(item)
+            logger.info(f"Version_History {len(versions)}개 로드")
+            return versions
+        except Exception as e:
+            logger.error(f"Version_History 조회 실패: {e}")
+            return []
 
     # ================== 유틸리티 메서드 ==================
     async def get_sheet_info(self) -> Dict:

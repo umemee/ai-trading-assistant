@@ -27,7 +27,8 @@ class MoleculeMatchResult:
                  match_ratio: float = 0.0,
                  signal_grade: str = "",
                  timestamp_utc: str = "",
-                 triggered: bool = False):
+                 triggered: bool = False,
+                 category: str = ""):
         self.matched = matched
         self.molecule_id = molecule_id
         self.molecule_name = molecule_name
@@ -37,6 +38,7 @@ class MoleculeMatchResult:
         self.signal_grade = signal_grade
         self.timestamp_utc = timestamp_utc or datetime.now(timezone.utc).isoformat()
         self.triggered = triggered
+        self.category = category
 
     def to_dict(self):
         return {
@@ -49,6 +51,7 @@ class MoleculeMatchResult:
             "signal_grade": self.signal_grade,
             "timestamp_utc": self.timestamp_utc,
             "triggered": self.triggered,
+            "category": self.category,
         }
 
 class MoleculeMatcher:
@@ -72,39 +75,33 @@ class MoleculeMatcher:
             self.load_demo_molecules()
         logger.info(f"분자 정의 {len(self.molecules_cache)}개 로드 완료")
 
-    # molecule_matcher.py의 load_molecules_from_sheets 메서드 수정
-async def load_molecules_from_sheets(self):
-    """Google Sheets에서 분자 정의 로드 - active 상태만 로드"""
-    try:
-        molecule_data = await self.sheets_service.get_molecules()
-        self.molecules_cache = {}
-        
-        for molecule in molecule_data:
-            molecule_id = molecule.get('Molecule_ID')
-            molecule_status = molecule.get('Status', '').lower()
-            
-            # ⭐ 승인 로직: active 상태인 분자만 로드
-            if molecule_id and molecule_status == 'active':
-                required_atoms = molecule.get('Required_Atom_IDs', [])
-                if isinstance(required_atoms, str):
-                    required_atoms = [aid.strip() for aid in required_atoms.split(',') if aid.strip()]
-
-                self.molecules_cache[molecule_id] = {
-                    'id': molecule_id,
-                    'name': molecule.get('Molecule_Name', ''),
-                    'category': molecule.get('Category', ''),
-                    'required_atoms': required_atoms,
-                    'match_threshold': float(molecule.get('Match_Threshold_%', 100)),
-                    'translation_notes': molecule.get('Translation_Notes', ''),
-                    'entry_sl_tp': molecule.get('Entry_SL_TP', ''),
-                    'status': molecule_status
-                }
-
-        logger.info(f"활성 분자 {len(self.molecules_cache)}개 로드 완료")
-
-    except Exception as e:
-        logger.error(f"Google Sheets 분자 로드 실패: {e}")
-        raise
+    async def load_molecules_from_sheets(self):
+        """Google Sheets에서 분자 정의 로드 - active 상태만 로드"""
+        try:
+            molecule_data = await self.sheets_service.get_molecules()
+            self.molecules_cache = {}
+            for molecule in molecule_data:
+                molecule_id = molecule.get('Molecule_ID')
+                molecule_status = molecule.get('Status', '').lower()
+                # ⭐ active 상태인 분자만 로드
+                if molecule_id and molecule_status == 'active':
+                    required_atoms = molecule.get('Required_Atom_IDs', [])
+                    if isinstance(required_atoms, str):
+                        required_atoms = [aid.strip() for aid in required_atoms.split(',') if aid.strip()]
+                    self.molecules_cache[molecule_id] = {
+                        'id': molecule_id,
+                        'name': molecule.get('Molecule_Name', ''),
+                        'category': molecule.get('Category', ''),
+                        'required_atoms': required_atoms,
+                        'match_threshold': float(molecule.get('Match_Threshold_%', 100)),
+                        'translation_notes': molecule.get('Translation_Notes', ''),
+                        'entry_sl_tp': molecule.get('Entry_SL_TP', ''),
+                        'status': molecule_status
+                    }
+            logger.info(f"활성 분자 {len(self.molecules_cache)}개 로드 완료")
+        except Exception as e:
+            logger.error(f"Google Sheets 분자 로드 실패: {e}")
+            raise
 
     def load_demo_molecules(self):
         self.molecules_cache = {
@@ -115,7 +112,8 @@ async def load_molecules_from_sheets(self):
                 'required_atoms': ['CTX-009', 'TRG-008', 'STR-003'],
                 'match_threshold': 100.0,
                 'translation_notes': '...',
-                'entry_sl_tp': ''
+                'entry_sl_tp': '',
+                'status': 'active'
             }
         }
 
@@ -136,39 +134,97 @@ async def load_molecules_from_sheets(self):
     def find_molecule_matches(self) -> List[MoleculeMatchResult]:
         """
         최근 N분 내의 아톰 조합을 분자 정의와 매칭
-        - 완전일치 또는 부분일치(매치율, 등급 산정)
-        - 마지막 신호 이후 중복방지 설정(쿨다운)
+        - 위험관리(회피/AVD) 신호가 있으면 반등/진입(EXP) 신호는 veto(무시)
+        - active 상태의 분자만 매칭
         """
         now_utc = datetime.now(timezone.utc)
-        occurred_results = []
-        # 최근 신호 중 가장 최신의 timestamp_utc 기준으로 수행
         recent_atoms = [a['atom_id'] for a in self.recent_signals]
         recent_atoms_set = set(recent_atoms)
-        # 각 분자 정의별 매칭
+        occurred_results = []
+
+        # 1. 먼저 모든 active 분자 중, 아톰 기준 매칭 결과 생성
+        matches_by_category = {"AVD": [], "EXP": [], "OTHER": []}
         for mid, molecule in self.molecules_cache.items():
             required_set = set(molecule['required_atoms'])
             matched_atoms = list(required_set & recent_atoms_set)
             unmatched_atoms = list(required_set - recent_atoms_set)
             match_ratio = 100.0 * len(matched_atoms) / len(required_set) if required_set else 0.0
-            # 마지막 신호 이후 쿨다운(중복 방지)
             last_time = self.last_matched_timestamp.get(mid)
             triggered = False
+            # 매치: 완전일치 또는 부분일치(문턱값 이상)
             if match_ratio >= molecule.get('match_threshold', 100.0):
-                # 매치: 완전일치 또는 부분일치(문턱값 이상)
+                # 쿨다운(중복 방지)
                 if not last_time or (now_utc - last_time).total_seconds() > 60:
                     triggered = True
                     self.last_matched_timestamp[mid] = now_utc
             grade = self.get_signal_grade(match_ratio)
-            occurred_results.append(MoleculeMatchResult(
-                matched=grade in ['A++', 'A+', 'A'],
-                molecule_id=mid,
-                molecule_name=molecule['name'],
-                matched_atoms=matched_atoms,
-                unmatched_atoms=unmatched_atoms,
-                match_ratio=match_ratio,
-                signal_grade=grade,
-                triggered=triggered
-            ))
+            cat = molecule.get('category', '').lower()
+            if "위험" in cat or "회피" in cat or "avd" in molecule.get('id', '').lower() or "avd" in cat:
+                matches_by_category["AVD"].append(MoleculeMatchResult(
+                    matched=grade in ['A++', 'A+', 'A'],
+                    molecule_id=mid,
+                    molecule_name=molecule['name'],
+                    matched_atoms=matched_atoms,
+                    unmatched_atoms=unmatched_atoms,
+                    match_ratio=match_ratio,
+                    signal_grade=grade,
+                    triggered=triggered,
+                    timestamp_utc=now_utc.isoformat(),
+                    category=molecule.get('category', ''),
+                ))
+            elif "진입" in cat or "반등" in cat or "exp" in molecule.get('id', '').lower() or "exp" in cat:
+                matches_by_category["EXP"].append(MoleculeMatchResult(
+                    matched=grade in ['A++', 'A+', 'A'],
+                    molecule_id=mid,
+                    molecule_name=molecule['name'],
+                    matched_atoms=matched_atoms,
+                    unmatched_atoms=unmatched_atoms,
+                    match_ratio=match_ratio,
+                    signal_grade=grade,
+                    triggered=triggered,
+                    timestamp_utc=now_utc.isoformat(),
+                    category=molecule.get('category', ''),
+                ))
+            else:
+                matches_by_category["OTHER"].append(MoleculeMatchResult(
+                    matched=grade in ['A++', 'A+', 'A'],
+                    molecule_id=mid,
+                    molecule_name=molecule['name'],
+                    matched_atoms=matched_atoms,
+                    unmatched_atoms=unmatched_atoms,
+                    match_ratio=match_ratio,
+                    signal_grade=grade,
+                    triggered=triggered,
+                    timestamp_utc=now_utc.isoformat(),
+                    category=molecule.get('category', ''),
+                ))
+
+        # 2. 위험관리(회피/AVD) 신호가 triggered/matched된 경우, EXP(진입/반등) 신호는 veto(무시)
+        vetoed_atoms = set()
+        avd_triggered = [m for m in matches_by_category["AVD"] if m.triggered and m.matched]
+        exp_triggered = [m for m in matches_by_category["EXP"] if m.triggered and m.matched]
+        other_triggered = [m for m in matches_by_category["OTHER"] if m.triggered and m.matched]
+
+        occurred_results.extend(avd_triggered)
+
+        if avd_triggered:
+            # veto: 회피/위험관리 신호가 발생한 아톰과 겹치는 EXP 신호는 무효화
+            avd_atoms = set()
+            for avd in avd_triggered:
+                avd_atoms.update(avd.matched_atoms)
+            for exp in exp_triggered:
+                # 만약 EXP 신호가 avd_atoms와 겹치면 무시
+                if avd_atoms & set(exp.matched_atoms):
+                    # veto, 무시
+                    continue
+                else:
+                    occurred_results.append(exp)
+        else:
+            # AVD 신호가 없으면 EXP 신호 정상적으로 추가
+            occurred_results.extend(exp_triggered)
+
+        occurred_results.extend(other_triggered)
+
         return occurred_results
 
     async def on_atom_signal(self, atom_signal: Dict[str, Any]):
@@ -258,6 +314,6 @@ if __name__ == "__main__":
 
         results = matcher.find_molecule_matches()
         for res in results:
-            print(f"분자: {res.molecule_id}, 매치률: {res.match_ratio:.1f}%, 등급: {res.signal_grade}, 트리거: {res.triggered}")
+            print(f"분자: {res.molecule_id}, 카테고리: {res.category}, 매치률: {res.match_ratio:.1f}%, 등급: {res.signal_grade}, 트리거: {res.triggered}")
 
     asyncio.run(test_molecule_matcher())

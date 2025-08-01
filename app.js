@@ -41,7 +41,7 @@ class TradingAssistant {
             return 'http://localhost:8000';
         } else if (hostname.includes('github.io')) {
             // TODO: 실제 배포된 백엔드 URL로 변경해야 합니다.
-            return 'https://your-backend-service.herokuapp.com';
+            return 'https://umemee.github.io/ai-trading-assistant/ws';
         } else {
             return 'http://localhost:8000';
         }

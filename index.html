@@ -4,57 +4,63 @@
   <meta charset="UTF-8">
   <title>AI 트레이딩 어시스턴트 V6.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- 폰트 및 아이콘 등 필요한 CSS를 포함하세요 -->
+  <!-- 아이콘 및 폰트 스타일링 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-gray-900 text-gray-100">
 
-  <!-- 비밀번호 입력 모달 -->
-  <div id="pw-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
-    <div class="bg-gray-800 rounded-xl p-8 flex flex-col items-center shadow-xl">
-      <h2 class="text-2xl font-bold mb-4">개인 로그인</h2>
-      <input id="pw-input" type="password" class="mb-4 p-2 rounded bg-gray-700 text-gray-100 w-64" placeholder="비밀번호를 입력하세요" autocomplete="off" />
-      <button id="pw-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded">로그인</button>
+  <!-- 로그인 모달 -->
+  <div id="pw-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h2 class="modal-title">개인 로그인</h2>
+      <input id="pw-input" type="password" class="modal-input" placeholder="비밀번호를 입력하세요" autocomplete="off" />
+      <button id="pw-btn" class="modal-btn">로그인</button>
+      <div id="login-status" class="modal-status"></div>
     </div>
   </div>
 
-  <nav class="bg-gray-800 sticky top-0 z-50">
-    <div class="container mx-auto flex justify-between items-center p-4">
-      <h1 class="text-xl font-bold">AI 트레이딩 어시스턴트 V6.0</h1>
-      <div class="flex space-x-2">
-        <button class="nav-item active" onclick="showSection('dashboard', this)">
-          <i class="fas fa-chart-pie mr-1"></i>대시보드
+  <!-- 상단 네비게이션 -->
+  <nav class="navbar">
+    <div class="navbar-container">
+      <h1 class="navbar-title">AI 트레이딩 어시스턴트 V6.0</h1>
+      <div class="navbar-menu">
+        <button class="nav-item active" data-section="dashboard">
+          <i class="fas fa-chart-pie"></i> 대시보드
         </button>
-        <button class="nav-item" onclick="showSection('scanner', this)">
-          <i class="fas fa-satellite-dish mr-1"></i>SignalScanner
+        <button class="nav-item" data-section="scanner">
+          <i class="fas fa-satellite-dish"></i> SignalScanner
         </button>
-        <button class="nav-item" onclick="showSection('approval', this)">
-          <i class="fas fa-check-double mr-1"></i>승인 워크플로우
+        <button class="nav-item" data-section="approval">
+          <i class="fas fa-check-double"></i> 승인 워크플로우
         </button>
-        <button class="nav-item" onclick="showSection('meta', this)">
-          <i class="fas fa-chart-line mr-1"></i>MetaLearner
+        <button class="nav-item" data-section="meta">
+          <i class="fas fa-chart-line"></i> MetaLearner
         </button>
-        <button class="nav-item" onclick="showSection('logic', this)">
-          <i class="fas fa-brain mr-1"></i>LogicDiscoverer
+        <button class="nav-item" data-section="logic">
+          <i class="fas fa-brain"></i> LogicDiscoverer
         </button>
-        <button class="nav-item" onclick="showSection('settings', this)">
-          <i class="fas fa-cog mr-1"></i>설정
+        <button class="nav-item" data-section="settings">
+          <i class="fas fa-cog"></i> 설정
+        </button>
+        <button id="logout-btn" class="nav-item nav-logout" style="display:none;">
+          <i class="fas fa-sign-out-alt"></i> 로그아웃
         </button>
       </div>
+      <div id="user-status" class="navbar-status"></div>
     </div>
   </nav>
 
-  <!-- 메인 콘텐츠 영역 -->
-  <div id="main" class="section" style="display: none;">
-    <div class="container mx-auto p-6">
+  <!-- 메인 콘텐츠 섹션 -->
+  <div id="main" class="section" style="display:none;">
+    <div class="container">
 
-      <!-- 대시보드 섹션 -->
+      <!-- 대시보드 -->
       <section id="dashboard" class="content-section active">
-        <h2 class="text-2xl font-bold mb-6">📊 대시보드</h2>
-        <div class="flex flex-wrap gap-6 mb-6">
-          <div class="bg-gray-800 rounded-lg p-4 w-60">
-            <div>시스템 상태: <span id="connection-status" class="status-success ml-2">-</span></div>
+        <h2 class="section-title">📊 대시보드</h2>
+        <div class="dashboard-cards">
+          <div class="dashboard-card">
+            <div>시스템 상태: <span id="connection-status" class="status-indicator">-</span></div>
             <div>초기화: <span id="system-initialized">-</span></div>
             <div>스캐너: <span id="system-scanning">-</span></div>
             <div>감시 종목: <span id="ticker-count">0</span></div>
@@ -62,108 +68,90 @@
             <div>분자 수: <span id="molecules-count">0</span></div>
             <div>업타임: <span id="system-uptime">-</span></div>
           </div>
-          <div class="bg-gray-800 rounded-lg p-4 w-60">
+          <div class="dashboard-card">
             <div class="mb-2">서비스 연결상태</div>
-            <div>Sheets: <span id="sheets-status" class="status-success">-</span></div>
-            <div>Gemini: <span id="gemini-status" class="status-success">-</span></div>
-            <div>Alpaca: <span id="alpaca-status" class="status-success">-</span></div>
+            <div>Sheets: <span id="sheets-status" class="status-indicator">-</span></div>
+            <div>Gemini: <span id="gemini-status" class="status-indicator">-</span></div>
+            <div>Alpaca: <span id="alpaca-status" class="status-indicator">-</span></div>
           </div>
         </div>
-        <div class="bg-gray-800 rounded-lg p-4 mb-6">
-          <h3 class="font-bold mb-2">최근 신호</h3>
-          <div id="signals-display" class="space-y-2"></div>
+        <div class="dashboard-log">
+          <h3>최근 신호</h3>
+          <div id="signals-display"></div>
         </div>
-        <div class="bg-gray-800 rounded-lg p-4 mb-6">
-          <h3 class="font-bold mb-2">시스템 로그</h3>
-          <div id="log-display" class="h-48 overflow-y-auto bg-gray-900 text-xs rounded"></div>
-          <div class="flex gap-2 mt-2">
-            <button onclick="exportLogs()" class="bg-blue-700 px-2 py-1 rounded text-white">로그 내보내기</button>
-            <button onclick="clearLogs()" class="bg-gray-700 px-2 py-1 rounded text-white">로그 삭제</button>
+        <div class="dashboard-log">
+          <h3>시스템 로그</h3>
+          <div id="log-display"></div>
+          <div class="log-actions">
+            <button onclick="exportLogs()" class="btn">로그 내보내기</button>
+            <button onclick="clearLogs()" class="btn">로그 삭제</button>
           </div>
         </div>
       </section>
 
-      <!-- SignalScanner 섹션 -->
+      <!-- SignalScanner -->
       <section id="scanner" class="content-section" style="display:none;">
-        <h2 class="text-2xl font-bold mb-6">📡 실시간 시그널 감시</h2>
-        <div class="bg-gray-800 rounded-lg p-6 mb-4">
-          <div class="flex gap-2 items-center mb-2">
-            <input id="ticker-input" type="text" class="rounded bg-gray-700 text-gray-100 px-2 py-1 w-32" placeholder="티커 입력" autocomplete="off" />
-            <button id="add-ticker-btn" class="bg-blue-600 px-3 py-1 rounded text-white">추가</button>
-          </div>
-          <div id="watchlist" class="flex gap-2 flex-wrap mb-2"></div>
-          <div class="flex gap-2 mt-2">
-            <button id="start-scanner-btn" class="bg-green-600 px-3 py-1 rounded text-white">스캐너 시작</button>
-            <button id="stop-scanner-btn" class="bg-red-600 px-3 py-1 rounded text-white">스캐너 정지</button>
-          </div>
+        <h2 class="section-title">📡 실시간 시그널 감시</h2>
+        <div class="scanner-controls">
+          <input id="ticker-input" type="text" class="input" placeholder="티커 입력" autocomplete="off" />
+          <button id="add-ticker-btn" class="btn">추가</button>
+          <div id="watchlist" class="watchlist"></div>
+          <button id="start-scanner-btn" class="btn btn-start">스캐너 시작</button>
+          <button id="stop-scanner-btn" class="btn btn-stop">스캐너 정지</button>
         </div>
       </section>
 
-      <!-- 승인 워크플로우(Approval) 섹션 -->
+      <!-- 승인 워크플로우 -->
       <section id="approval" class="content-section" style="display:none;">
-        <h2 class="text-2xl font-bold mb-6">🔍 검역 전략 검토</h2>
-        <div class="bg-gray-800 rounded-lg p-6">
-          <table id="approval-table" class="w-full text-left border-collapse">
-            <!-- 동적 테이블 데이터 -->
+        <h2 class="section-title">🔍 검역 전략 검토</h2>
+        <div>
+          <table id="approval-table" class="table">
+            <!-- 동적으로 생성됨 -->
           </table>
         </div>
       </section>
 
-      <!-- MetaLearner 섹션 -->
+      <!-- MetaLearner -->
       <section id="meta" class="content-section" style="display:none;">
-        <h2 class="text-2xl font-bold mb-6">🧠 MetaLearner (복기/피드백)</h2>
-        <div class="bg-gray-800 rounded-lg p-6">
-          <table id="meta-table" class="w-full text-left border-collapse">
-            <!-- 동적 테이블 데이터 -->
+        <h2 class="section-title">🧠 MetaLearner (복기/피드백)</h2>
+        <div>
+          <table id="meta-table" class="table">
+            <!-- 동적으로 생성됨 -->
           </table>
         </div>
       </section>
 
-      <!-- LogicDiscoverer 섹션 -->
+      <!-- LogicDiscoverer -->
       <section id="logic" class="content-section" style="display:none;">
-        <h2 class="text-2xl font-bold mb-6">🧬 LogicDiscoverer (AI 전략 제안)</h2>
-        <div class="bg-gray-800 rounded-lg p-6 mb-4">
-          <form id="logic-form" onsubmit="return false;">
-            <div class="flex gap-2 mb-2">
-              <input id="analysis-ticker" type="text" class="rounded bg-gray-700 text-gray-100 px-2 py-1 w-32" placeholder="티커 입력" autocomplete="off" />
-              <input id="analysis-date" type="date" class="rounded bg-gray-700 text-gray-100 px-2 py-1 w-40" />
-              <input id="analysis-context" type="text" class="rounded bg-gray-700 text-gray-100 px-2 py-1 w-64" placeholder="사용자 통찰 입력" autocomplete="off" />
-              <button id="analyze-btn" class="bg-blue-600 px-3 py-1 rounded text-white">분석 요청</button>
-            </div>
-          </form>
-          <div id="analysis-result" class="mt-4"></div>
-        </div>
+        <h2 class="section-title">🧬 LogicDiscoverer (AI 전략 제안)</h2>
+        <form id="logic-form" onsubmit="return false;">
+          <input id="analysis-ticker" type="text" class="input" placeholder="티커 입력" autocomplete="off" />
+          <input id="analysis-date" type="date" class="input" />
+          <input id="analysis-context" type="text" class="input" placeholder="사용자 통찰 입력" autocomplete="off" />
+          <button id="analyze-btn" class="btn">분석 요청</button>
+        </form>
+        <div id="analysis-result"></div>
       </section>
 
-      <!-- 설정 섹션 -->
+      <!-- 설정 -->
       <section id="settings" class="content-section" style="display:none;">
-        <h2 class="text-2xl font-bold mb-6">⚙️ API/서비스 설정</h2>
-        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-auto">
-          <div class="mb-2">
-            <label for="alpaca-key" class="block mb-1">Alpaca API Key</label>
-            <input id="alpaca-key" type="text" class="rounded bg-gray-700 text-gray-100 px-2 py-1 w-full" autocomplete="off" />
-          </div>
-          <div class="mb-2">
-            <label for="alpaca-secret" class="block mb-1">Alpaca API Secret</label>
-            <input id="alpaca-secret" type="text" class="rounded bg-gray-700 text-gray-100 px-2 py-1 w-full" autocomplete="off" />
-          </div>
-          <div class="mb-2">
-            <label for="gemini-key" class="block mb-1">Gemini API Key</label>
-            <input id="gemini-key" type="text" class="rounded bg-gray-700 text-gray-100 px-2 py-1 w-full" autocomplete="off" />
-          </div>
-          <div class="mb-2">
-            <label for="sheets-id" class="block mb-1">Google Sheets ID</label>
-            <input id="sheets-id" type="text" class="rounded bg-gray-700 text-gray-100 px-2 py-1 w-full" autocomplete="off" />
-          </div>
-          <div class="mb-2">
-            <label for="google-service-account" class="block mb-1">Google Service Account JSON</label>
-            <textarea id="google-service-account" class="rounded bg-gray-700 text-gray-100 px-2 py-1 w-full" rows="3"></textarea>
-          </div>
-          <div class="flex gap-2 mt-2">
-            <button id="save-api-btn" class="bg-blue-700 px-3 py-1 rounded text-white">설정 저장</button>
-            <button id="test-connection-btn" class="bg-green-700 px-3 py-1 rounded text-white">연결 테스트</button>
-            <button id="init-system-btn" class="bg-gray-700 px-3 py-1 rounded text-white">시스템 초기화</button>
-            <button id="connect-ws-btn" class="bg-orange-600 px-3 py-1 rounded text-white">WebSocket 재연결</button>
+        <h2 class="section-title">⚙️ API/서비스 설정</h2>
+        <div class="settings-box">
+          <label for="alpaca-key">Alpaca API Key</label>
+          <input id="alpaca-key" type="text" class="input" autocomplete="off" />
+          <label for="alpaca-secret">Alpaca API Secret</label>
+          <input id="alpaca-secret" type="text" class="input" autocomplete="off" />
+          <label for="gemini-key">Gemini API Key</label>
+          <input id="gemini-key" type="text" class="input" autocomplete="off" />
+          <label for="sheets-id">Google Sheets ID</label>
+          <input id="sheets-id" type="text" class="input" autocomplete="off" />
+          <label for="google-service-account">Google Service Account JSON</label>
+          <textarea id="google-service-account" class="input" rows="3"></textarea>
+          <div class="settings-actions">
+            <button id="save-api-btn" class="btn">설정 저장</button>
+            <button id="test-connection-btn" class="btn">연결 테스트</button>
+            <button id="init-system-btn" class="btn">시스템 초기화</button>
+            <button id="connect-ws-btn" class="btn">WebSocket 재연결</button>
           </div>
         </div>
       </section>

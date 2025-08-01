@@ -16,6 +16,8 @@
 *.p12
 *.pfx
 config.json
+config/production.json
+production.json
 secrets.json
 credentials.json
 service-account-*.json
